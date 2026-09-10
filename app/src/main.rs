@@ -98,6 +98,7 @@ fn main() {
     LaunchBuilder::new()
         .with_cfg(
             Config::new()
+                .with_menu(None)
                 .with_window(
                     WindowBuilder::new()
                         .with_title("ShuhariTech | Fumiko")
