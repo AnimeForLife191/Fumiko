@@ -1,0 +1,123 @@
+.trash {
+    width: min(100%, var(--page-max-width));
+    margin: 0 auto;
+    padding-bottom: 48px;
+    box-sizing: border-box;
+}
+
+.trash__header {
+    margin-bottom: 24px;
+}
+
+.trash__title {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, var(--text-primary), var(--accent-secondary-bright));
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.trash__subtitle {
+    margin: 6px 0 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.trash__panel {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    backdrop-filter: blur(14px);
+    box-shadow: var(--panel-shadow);
+    overflow: hidden;
+}
+
+/* ==========================================================================
+   Trash Email Row
+   ========================================================================== */
+.trash-email-row {
+    display: grid;
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.2fr) minmax(160px, 1.1fr) 110px;
+    gap: 14px;
+    align-items: center;
+    min-height: 52px;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+    box-sizing: border-box;
+}
+
+/* Prevents long text from breaking grid columns */
+.trash-email-row > * {
+    min-width: 0;
+}
+
+.trash-email-row:last-child {
+    border-bottom: 0;
+}
+
+.trash-email-row:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.trash-email-row__subject {
+    color: var(--text-primary);
+    font-size: 13.5px;
+    font-weight: 600;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    line-height: 1.25;
+}
+
+.trash-email-row__sender,
+.trash-email-row__trashed-at {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.trash-email-row__restore-btn {
+    justify-self: end;
+    padding: 6px 14px;
+    border: 1px solid var(--accent-primary);
+    border-radius: var(--radius-md);
+    background: var(--gradient-primary);
+    color: var(--text-on-accent);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 650;
+    cursor: pointer;
+    box-shadow: 0 4px 14px var(--accent-primary-glow);
+    transition: all var(--transition-fast);
+    user-select: none;
+}
+
+.trash-email-row__restore-btn:hover:not(:disabled) {
+    background: var(--gradient-accent);
+    box-shadow: 0 6px 18px var(--accent-primary-glow);
+    transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   Responsive Breakpoints
+   ========================================================================== */
+@media (max-width: 760px) {
+    .trash-email-row {
+        grid-template-columns: 1fr;
+        gap: 6px;
+        padding: 14px 18px;
+    }
+    
+    .trash-email-row__restore-btn {
+        justify-self: start;
+        margin-top: 4px;
+    }
+}

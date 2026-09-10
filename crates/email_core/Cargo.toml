@@ -1,0 +1,28 @@
+[package]
+name = "email_core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+common.workspace = true
+storage.workspace = true
+oauth.workspace = true
+local_ai.workspace = true
+
+async-trait = "0.1.92"
+futures = "0.3.34"
+chrono = "0.4.45"
+base64 = "0.23.1"
+encoding_rs = "0.8.35"
+html2text = "0.17.1"
+notify-rust = "4.11"
+reqwest.workspace = true
+serde.workspace = true
+uuid.workspace = true
+tokio.workspace = true
+envcrypt.workspace = true
+oauth2.workspace = true
+tracing.workspace = true
+
+[build-dependencies]
+dotenvy = "0.15.7"

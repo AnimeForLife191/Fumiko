@@ -24,8 +24,9 @@ You give her rules for what you care about (like *"job interviews"*, *"urgent cl
 
 ---
 
-<!-- Optional: Add an application screenshot or demo GIF here -->
-<!-- ![Fumiko Dashboard Preview](assets/screenshot-dashboard.png) -->
+<div align="center">
+  <img src="app/assets/screenshots/screenshot_dashboard.png" alt="Fumiko Dashboard Preview" width="1200">
+</div>
 
 ## What She Does
 
@@ -54,12 +55,12 @@ Fumiko is organized as a modular Rust workspace. If you're exploring the codebas
 
 | Crate / Part | What it handles | Notes |
 | :--- | :--- | :--- |
-| **`email_core`** | Sync engine, Gmail History API, Microsoft Graph Delta queries, safe cursor updates, and MIME body parsing. | [📖 Sync & Provider Notes](docs/email_core.md) |
+| **`email_core`** | Sync engine, Gmail History API, Microsoft Graph Delta queries, safe cursor updates, and MIME body parsing. | [Sync & Provider Notes](docs/email_core.md) |
 | **`oauth`** | RFC 8252 loopback authorization code flow with PKCE, dynamic ephemeral port binding (`127.0.0.1:0`), and constant-time CSRF validation. | [📖 OAuth Architecture](docs/oauth.md) |
-| **`local_ai`** | Background Ollama daemon management, streaming model downloads, prompts, and context window limits. | [📖 Local AI Architecture](docs/local_ai.md) |
-| **`storage`** | SQLite engine, WAL mode, UUIDv7 indexing, foreign keys, and the OS Keyring `TokenStore` abstraction. | [📖 Storage Architecture](docs/storage.md) |
-| **`security`** | Threat model, memory-only access tokens, sanitized logging, and connection safety. | [📖 Security Notes](docs/security.md) |
-| **`app`** | Desktop frontend built with Dioxus, reactive state, sanitized iframe rendering, and custom CSS injection. | Source in `/app` |
+| **`local_ai`** | Background Ollama daemon management, streaming model downloads, prompts, and context window limits. | [Local AI Architecture](docs/local_ai.md) |
+| **`storage`** | SQLite engine, WAL mode, UUIDv7 indexing, foreign keys, and the OS Keyring `TokenStore` abstraction. | [Storage Architecture](docs/storage.md) |
+| **`security`** | Threat model, memory-only access tokens, sanitized logging, and connection safety. | [Security Notes](docs/security.md) |
+| **`app`** | Desktop frontend built with Dioxus, reactive state, sanitized iframe rendering, and custom CSS injection. |[UI Notes](docs/ui.md) |
 
 ---
 
@@ -108,7 +109,7 @@ Fumiko works out of the box with **personal Microsoft accounts** (`@outlook.com`
 > **Account Setup & Verification (Why Gmail needs your own keys)**  
 > * **Personal Microsoft Accounts** (`@outlook.com`, `@hotmail.com`): Connect out of the box with zero extra setup.
 > * **School & Work Microsoft Accounts**: Will show a **"Need admin approval"** screen because Microsoft requires "Publisher Verification" (a registered company, D-U-N-S number, and Partner Center account). 
-> * **Gmail Accounts**: Because Google requires full app verification before allowing public sign-ins for restricted scopes, you'll need to set up your own free Google Cloud keys (it takes ~2 minutes—guide below).
+> * **Gmail Accounts**: Because Google requires full app verification before allowing public sign-ins for restricted scopes, you'll need to set up your own free Google Cloud keys (it takes ~2 minutes. Guide below).
 > 
 > I'm a 22-year-old solo developer building this project in my spare time, so I can't jump through those enterprise legal hoops on a whim right now. If Fumiko gets enough traction, I'll definitely look into doing the corporate paperwork down the line. Until then, personal Microsoft accounts work seamlessly, and the quick Google setup below gets Gmail running in no time!
 

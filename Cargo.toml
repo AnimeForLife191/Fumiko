@@ -1,0 +1,24 @@
+[workspace]
+resolver = "2"
+members = ["app", "crates/local_ai", "crates/common", "crates/email_core", "crates/oauth", "crates/storage"]
+
+[workspace.dependencies]
+common = {path = "crates/common"}
+storage = {path = "crates/storage"}
+oauth = {path = "crates/oauth"}
+email_core = {path = "crates/email_core"}
+local_ai = {path = "crates/local_ai"}
+
+# oauth2 uses reqwest version "0.12". Do not change
+reqwest = { version = "0.12", features = ["json", "stream"] }
+oauth2 = "5.0.0"
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros"] }
+thiserror = "2.0.20"
+uuid = { version = "1.26.0", features = ["v7", "serde"] }
+sqlx = { version = "0.9.0", features = ["runtime-tokio", "sqlite", "migrate", "macros"] }
+keyring = "4.1.6"
+serde_json = "1.0.151"
+serde = "1.0.229"
+envcrypt = "0.5.0"
+tracing = "0.1.41"
+webbrowser = "1.2.4"

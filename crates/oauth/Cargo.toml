@@ -1,0 +1,19 @@
+[package]
+name = "oauth"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+common.workspace = true
+storage.workspace = true
+
+webbrowser.workspace = true
+tokio.workspace = true
+thiserror.workspace = true
+serde_json.workspace = true
+reqwest.workspace = true
+envcrypt.workspace = true
+oauth2.workspace = true
+
+[build-dependencies]
+dotenvy = "0.15.7"

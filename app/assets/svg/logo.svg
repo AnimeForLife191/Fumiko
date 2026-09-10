@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%" role="img">
+  <title>F icon</title>
+  <defs>
+    <linearGradient id="fumikoGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6" />
+      <stop offset="100%" stop-color="#ff7f8a" />
+    </linearGradient>
+  </defs>
+  <rect x="32" y="32" width="448" height="448" rx="128" fill="#0b1120" />
+  <path d="M176 128 L344 128 L344 176 L224 176 L224 240 L312 240 L312 288 L224 288 L224 384 L176 384 Z" 
+        fill="url(#fumikoGrad3)" stroke="url(#fumikoGrad3)" stroke-width="2" stroke-linejoin="round" />
+</svg>

@@ -1,0 +1,267 @@
+.inbox {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+
+.inbox__header {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-surface-raised);
+}
+
+.inbox__heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.inbox__title-wrap {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.inbox__title {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 750;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.inbox__subtitle {
+    margin: 2px 0 0;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.inbox__stats {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 11.5px;
+}
+
+.inbox__count {
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.inbox__unread {
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--accent-secondary-subtle);
+    color: var(--accent-secondary-bright);
+    font-weight: 700;
+    font-size: 11px;
+}
+
+.inbox__last-synced {
+    color: var(--text-muted);
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.inbox__sync-button {
+    flex: 0 0 auto;
+    padding: 6px 14px;
+    border: 1px solid var(--accent-primary);
+    border-radius: var(--radius-md);
+    background: var(--gradient-primary);
+    color: var(--text-on-accent);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 650;
+    cursor: pointer;
+    box-shadow: 0 2px 10px var(--accent-primary-glow);
+    transition: all var(--transition-fast);
+    user-select: none;
+}
+
+.inbox__sync-button:hover:not(:disabled) {
+    background: var(--gradient-accent);
+    box-shadow: 0 4px 16px var(--accent-primary-glow);
+    transform: translateY(-1px);
+}
+
+.inbox__sync-button:disabled {
+    cursor: wait;
+    opacity: 0.6;
+    transform: none;
+}
+
+.inbox__message-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ==========================================================================
+   Inbox Email Row (3-Tier Structure)
+   ========================================================================== */
+.inbox-email-row {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    position: relative;
+    box-sizing: border-box;
+}
+
+.inbox-email-row:last-child {
+    border-bottom: 0;
+}
+
+.inbox-email-row:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.inbox-email-row--selected {
+    border-left: 3px solid var(--accent-primary-bright) !important;
+    background: var(--accent-primary-subtle) !important;
+}
+
+.inbox-email-row--selected .inbox-email-row__subject {
+    color: var(--text-primary);
+}
+
+.inbox-email-row--unread {
+    border-left: 3px solid var(--accent-secondary);
+    background: var(--accent-secondary-subtle);
+}
+
+.inbox-email-row--unread .inbox-email-row__subject {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* Row 1: Account tag on left, Time on right */
+.inbox-email-row__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+}
+
+.inbox-email-row__account {
+    font-size: 11px;
+    font-weight: 650;
+    color: var(--accent-primary-bright);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.inbox-email-row__time {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* Row 2: Subject on left, Delete button on right */
+.inbox-email-row__subject-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+}
+
+.inbox-email-row__subject {
+    flex: 1 1 auto;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    line-height: 1.25;
+}
+
+.inbox-email-row__trash-btn {
+    flex: 0 0 auto;
+    padding: 3px 6px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: all var(--transition-fast);
+    user-select: none;
+}
+
+.inbox-email-row:hover .inbox-email-row__trash-btn {
+    opacity: 1;
+    border-color: var(--border-accent);
+    background: var(--accent-secondary-subtle);
+    color: var(--accent-secondary-bright);
+}
+
+.inbox-email-row__trash-btn:hover {
+    background: var(--accent-secondary) !important;
+    color: var(--text-on-accent) !important;
+    border-color: var(--accent-secondary-bright);
+}
+
+/* Row 3: Sender */
+.inbox-email-row__sender {
+    font-size: 12px;
+    color: var(--text-muted);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* ==========================================================================
+   Email Body Rendering Containers
+   ========================================================================== */
+.email-body__frame {
+    display: block;
+    width: 100%;
+    flex: 1 1 auto;
+    height: 100%;
+    min-height: 400px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: #ffffff; /* HTML emails require white frame background */
+    color-scheme: light;
+    box-sizing: border-box;
+}
+
+.email-body-text {
+    flex: 1 1 auto;
+    margin: 0;
+    padding: 16px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface-raised);
+    color: var(--text-primary);
+    font-family: inherit;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    box-sizing: border-box;
+}

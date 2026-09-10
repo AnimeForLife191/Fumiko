@@ -1,0 +1,15 @@
+[package]
+name = "storage"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+common.workspace = true
+
+tempfile = "3.27.0"
+sqlx.workspace = true
+keyring.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+serde.workspace = true
+tokio.workspace = true
