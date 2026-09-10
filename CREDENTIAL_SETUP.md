@@ -107,5 +107,3 @@ You are attempting to log into a corporate or educational Microsoft 365 tenant. 
 
 ### Loopback Timeout / Port Stuck
 Fumiko binds to dynamic port `127.0.0.1:0` to eliminate port collisions. If you close your browser before completing the sign-in, the request will automatically time out after 60 seconds, or you can click **Cancel Connecting** in the app to immediately release the listener.
-
----
