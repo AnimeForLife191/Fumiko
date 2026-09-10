@@ -54,9 +54,9 @@ jobs:
         with:
           tool: dioxus-cli
 
-      # Build with Dioxus CLI (bundles binary + assets)
+      # Build with Dioxus CLI (bundles binary + assets for the fumiko package)
       - name: Build with Dioxus CLI
-        run: dx build --release --platform desktop
+        run: dx build --release --platform desktop --package fumiko
 
       # Package Windows (.zip containing fumiko.exe + assets)
       - name: Package Windows Release Archive
