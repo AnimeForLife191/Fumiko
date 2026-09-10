@@ -1,0 +1,82 @@
+name: Release Fumiko
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform_name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows MSVC Build
+          - os: windows-latest
+            platform_name: Windows
+            archive_name: fumiko-x86_64-pc-windows-msvc.zip
+            target_os: windows
+
+          # Linux GNU Build
+          - os: ubuntu-latest
+            platform_name: Linux
+            archive_name: fumiko-x86_64-unknown-linux-gnu.tar.gz
+            target_os: linux
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Install all required Linux build, webview, and SSL dependencies
+      - name: Install Linux GUI Dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      # Fast Dioxus CLI install (downloads prebuilt binary in seconds)
+      - name: Install Dioxus CLI
+        uses: taiki-e/install-action@v2
+        with:
+          tool: dioxus-cli
+
+      # Build with Dioxus CLI (bundles binary + assets)
+      - name: Build with Dioxus CLI
+        run: dx build --release --platform desktop
+
+      # Package Windows (.zip containing fumiko.exe + assets)
+      - name: Package Windows Release Archive
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cd target/dx/*/release/windows/*/
+          7z a "${{ github.workspace }}/${{ matrix.archive_name }}" *
+
+      # Package Linux (.tar.gz containing fumiko binary + assets)
+      - name: Package Linux Release Archive
+        if: runner.os == 'Linux'
+        run: |
+          cd target/dx/*/release/linux/*/
+          tar -czvf "${{ github.workspace }}/${{ matrix.archive_name }}" *
+
+      # Upload to GitHub Releases
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.archive_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
