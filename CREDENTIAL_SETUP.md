@@ -109,16 +109,3 @@ You are attempting to log into a corporate or educational Microsoft 365 tenant. 
 Fumiko binds to dynamic port `127.0.0.1:0` to eliminate port collisions. If you close your browser before completing the sign-in, the request will automatically time out after 60 seconds, or you can click **Cancel Connecting** in the app to immediately release the listener.
 
 ---
-
-### Where to link this in your other files:
-
-1. **In `README.md`**:
-   Replace the long collapsible sections with a quick summary and a link:
-   ```markdown
-   For full, step-by-step instructions on creating your own Google and Microsoft keys, see [CREDENTIAL_SETUP.md](CREDENTIAL_SETUP.md).
-   ```
-2. **In `doc.html`**:
-   Add it as a first-class guide in the sidebar:
-   ```html
-   <li><button class="docs-btn" data-file="CREDENTIAL_SETUP.md" data-source="root">🔑 Custom Credential Setup</button></li>
-   ```
