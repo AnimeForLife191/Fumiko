@@ -56,7 +56,7 @@ Fumiko is organized as a modular Rust workspace. If you're exploring the codebas
 | Crate / Part | What it handles | Notes |
 | :--- | :--- | :--- |
 | **`email_core`** | Sync engine, Gmail History API, Microsoft Graph Delta queries, safe cursor updates, and MIME body parsing. | [Sync & Provider Notes](docs/email_core.md) |
-| **`oauth`** | RFC 8252 loopback authorization code flow with PKCE, dynamic ephemeral port binding (`127.0.0.1:0`), and constant-time CSRF validation. | [📖 OAuth Architecture](docs/oauth.md) |
+| **`oauth`** | RFC 8252 loopback authorization code flow with PKCE, dynamic ephemeral port binding (`127.0.0.1:0`), and constant-time CSRF validation. | [OAuth Architecture](docs/oauth.md) |
 | **`local_ai`** | Background Ollama daemon management, streaming model downloads, prompts, and context window limits. | [Local AI Architecture](docs/local_ai.md) |
 | **`storage`** | SQLite engine, WAL mode, UUIDv7 indexing, foreign keys, and the OS Keyring `TokenStore` abstraction. | [Storage Architecture](docs/storage.md) |
 | **`security`** | Threat model, memory-only access tokens, sanitized logging, and connection safety. | [Security Notes](docs/security.md) |
