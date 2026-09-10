@@ -11,7 +11,7 @@ oauth.workspace = true
 local_ai.workspace = true
 
 dioxus = { version = "0.7.10", features = ["desktop", "router"] }
-rfd = "0.17.2"
+rfd = { version = "0.17.2", default-features = false, features = ["xdg-portal"] }
 chrono = { version = "0.4.41", default-features = false, features = ["clock"] }
 ammonia = "4.1.4"
 self_update = "1.3.0"
