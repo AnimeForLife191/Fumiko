@@ -56,34 +56,28 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      # 4. Fast Dioxus CLI install
-      - name: Install Dioxus CLI
-        uses: taiki-e/install-action@v2
-        with:
-          tool: dioxus-cli
-
-      # 5. Build with Dioxus CLI (passes env var and compiles with bundled key)
-      - name: Build with Dioxus CLI
+      # 4. Build directly with Cargo (CSS & assets are baked inside via include_str! / include_bytes!)
+      - name: Build with Cargo
         env:
           MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
-        run: dx build --release --platform desktop --package fumiko
+        run: cargo build --release --package fumiko
 
-      # 6. Package Windows (.zip containing fumiko.exe + assets)
+      # 5. Package Windows (.zip containing standalone fumiko.exe)
       - name: Package Windows Release Archive
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          cd target/dx/*/release/windows/*/
-          7z a "${{ github.workspace }}/${{ matrix.archive_name }}" *
+          cd target/release
+          7z a "${{ github.workspace }}/${{ matrix.archive_name }}" fumiko.exe
 
-      # 7. Package Linux (.tar.gz containing fumiko binary + assets)
+      # 6. Package Linux (.tar.gz containing standalone fumiko binary)
       - name: Package Linux Release Archive
         if: runner.os == 'Linux'
         run: |
-          cd target/dx/*/release/linux/*/
-          tar -czvf "${{ github.workspace }}/${{ matrix.archive_name }}" *
+          cd target/release
+          tar -czvf "${{ github.workspace }}/${{ matrix.archive_name }}" fumiko
 
-      # 8. Upload Artifacts to GitHub Release
+      # 7. Upload Artifacts to GitHub Release
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
