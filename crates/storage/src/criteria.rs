@@ -5,6 +5,74 @@ use super::{Storage, StorageError, unix_timestamp};
 use uuid::Uuid;
 
 impl Storage {
+    /// Seeds default starter criteria on a fresh install.
+    pub async fn seed_default_criteria(&self) -> Result<(), StorageError> {
+        let already_seeded: Option<(String,)> = sqlx::query_as(
+            "SELECT value FROM settings WHERE key = 'has_seeded_default_criteria'",
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        if already_seeded.is_some() {
+            return Ok(());
+        }
+
+        let (existing_count,): (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM watch_criteria",
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        if existing_count > 0 {
+            sqlx::query(
+                "INSERT INTO settings (key, value) VALUES ('has_seeded_default_criteria', 'true')
+                 ON CONFLICT(key) DO UPDATE SET value = 'true'",
+            )
+            .execute(&self.pool)
+            .await?;
+            return Ok(());
+        }
+
+        let defaults = [
+            (
+                "Careers & Interviews",
+                "Job interview invitations, recruiter outreach, screening calls, and hiring status updates.",
+            ),
+            (
+                "Receipts & Invoices",
+                "Payment receipts, subscription renewals, invoices, order confirmations, and shipping tracking updates.",
+            ),
+            (
+                "Urgent / Action Required",
+                "Direct requests requiring a prompt reply, document signature, contract review, or action under a time constraint.",
+            ),
+        ];
+
+        let now = unix_timestamp();
+
+        for (label, description) in defaults {
+            let id = Uuid::now_v7().to_string();
+            sqlx::query(
+                "INSERT INTO watch_criteria (id, label, description, is_active, created_at)
+                 VALUES (?, ?, ?, 1, ?)",
+            )
+            .bind(id)
+            .bind(label)
+            .bind(description)
+            .bind(now)
+            .execute(&self.pool)
+            .await?;
+        }
+
+        sqlx::query(
+            "INSERT INTO settings (key, value) VALUES ('has_seeded_default_criteria', 'true')
+             ON CONFLICT(key) DO UPDATE SET value = 'true'",
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
     /// Inserts a new watch criterion for automated AI classification.
     pub async fn add_criterion(
         &self,

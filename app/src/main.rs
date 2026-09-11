@@ -83,13 +83,25 @@ fn main() {
 
     let db_path = data_dir.join(DB_NAME);
 
-    let pool = tokio::runtime::Runtime::new()
-        .expect("Failed to create Tokio runtime")
-        .block_on(init_pool(db_path.to_str().expect("Invalid database path")))
-        .expect("Failed to initialize database");
+    let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
+
+    let storage = runtime.block_on(async {
+        let pool = init_pool(db_path.to_str().expect("Invalid database path"))
+            .await
+            .expect("Failed to initialize database");
+        
+        let storage = Storage::new(pool);
+
+        // Seeds the default criteria if this is a fresh install
+        if let Err(e) = storage.seed_default_criteria().await {
+            error!("Failed to seed default criteria: {e}");
+        }
+
+        storage
+    });
 
     STORAGE
-        .set(Storage::new(pool))
+        .set(storage)
         .expect("Storage has already been initialized");
 
     let window_icon = load_window_icon();
