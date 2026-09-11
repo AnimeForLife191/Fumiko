@@ -28,14 +28,16 @@ use utils::load_custom_css;
 use email_core::{link_gmail_account, link_outlook_account};
 use state::{AuthCommand, AppState};
 
-static SHARED_CSS: Asset = asset!("/assets/css/default/shared.css");
-static LAYOUT_CSS: Asset = asset!("/assets/css/default/layout.css");
-static DASHBOARD_CSS: Asset = asset!("/assets/css/default/dashboard.css");
-static SETTINGS_CSS: Asset = asset!("/assets/css/default/settings.css");
-static ADD_ACCOUNT_CSS: Asset = asset!("/assets/css/default/add_account.css");
-static INBOX_CSS: Asset = asset!("/assets/css/default/inbox.css");
-static FINDINGS_CSS: Asset = asset!("/assets/css/default/findings.css");
-static TRASH_CSS: Asset = asset!("/assets/css/default/trash.css");
+const ALL_CSS: &str = concat!(
+    include_str!("../assets/css/default/shared.css"), "\n",
+    include_str!("../assets/css/default/layout.css"), "\n",
+    include_str!("../assets/css/default/dashboard.css"), "\n",
+    include_str!("../assets/css/default/settings.css"), "\n",
+    include_str!("../assets/css/default/add_account.css"), "\n",
+    include_str!("../assets/css/default/inbox.css"), "\n",
+    include_str!("../assets/css/default/findings.css"), "\n",
+    include_str!("../assets/css/default/trash.css"),
+);
 
 const DB_NAME: &str = "fumiko.db";
 static STORAGE: OnceLock<Storage> = OnceLock::new();
@@ -323,14 +325,7 @@ fn Fumiko() -> Element {
     });
 
     rsx! {
-        document::Stylesheet { href: SHARED_CSS }
-        document::Stylesheet { href: LAYOUT_CSS }
-        document::Stylesheet { href: DASHBOARD_CSS }
-        document::Stylesheet { href: SETTINGS_CSS }
-        document::Stylesheet { href: ADD_ACCOUNT_CSS }
-        document::Stylesheet { href: INBOX_CSS }
-        document::Stylesheet { href: FINDINGS_CSS }
-        document::Stylesheet { href: TRASH_CSS }
+        style { "{ALL_CSS}" }
 
         if let Some(css) = custom_css() {
             style { "{css}" }
