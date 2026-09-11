@@ -133,7 +133,6 @@ Microsoft Graph strictly requires the **`User.Read`** scope alongside `Mail.Read
 
 ## Known Limitations
 
-* **No Active UI Cancel Handle**: If a user switches back to Fumiko and wants to dismiss a pending login, there is currently no exposed channel to cancel the blocking loopback listener immediately from the frontend. The attempt must wait out the one minute timeout before the port is released.
 * **End-to-End Live Token Tests**: Unit tests cover state validation, callback parsing, URL decoding, and timeout cancellation. However, live token exchanges are not covered in CI because they require live mock identity provider endpoints.
 
 ---

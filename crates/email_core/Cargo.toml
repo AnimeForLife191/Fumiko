@@ -23,6 +23,7 @@ tokio.workspace = true
 envcrypt.workspace = true
 oauth2.workspace = true
 tracing.workspace = true
+regex.workspace = true
 
 [build-dependencies]
 dotenvy = "0.15.7"

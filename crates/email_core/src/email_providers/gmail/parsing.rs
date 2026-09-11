@@ -136,8 +136,10 @@ pub async fn apply_inline_images(
         };
         let standard_b64 = STANDARD.encode(&bytes);
 
-        let data_url = format!("data:{mime_type};base64,{standard_b64}");
-        html = html.replace(&format!("cid:{content_id}"), &data_url);
+        let data_uri = format!("data:{mime_type};base64,{standard_b64}");
+        if let Ok(re) = regex::Regex::new(&format!(r"(?i)cid:{}", regex::escape(content_id))) {
+            html = re.replace_all(&html, &data_uri).into_owned();
+        }
     }
 
     Ok(Some(html))

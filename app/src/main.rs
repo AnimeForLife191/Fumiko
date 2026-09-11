@@ -104,7 +104,18 @@ fn main() {
                         .with_title("ShuhariTech | Fumiko")
                         .with_window_icon(Some(window_icon)),
                 )
-                .with_close_behaviour(WindowCloseBehaviour::WindowHides),
+                .with_close_behaviour(WindowCloseBehaviour::WindowHides)
+                .with_navigation_handler(|url| {
+                    if url.starts_with("http://") 
+                        || url.starts_with("https://") 
+                        || url.starts_with("mailto:")
+                    {
+                        let _ = webbrowser::open(url);
+                        false
+                    } else {
+                        true
+                    }
+                }),
         )
         .launch(Fumiko);
 }

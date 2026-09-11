@@ -95,7 +95,10 @@ pub fn apply_inline_images(
 
         let clean_cid = content_id.trim_start_matches('<').trim_end_matches('>');
         let data_uri = format!("data:{content_type};base64,{content_bytes}");
-        html = html.replace(&format!("cid:{clean_cid}"), &data_uri);
+        
+        if let Ok(re) = regex::Regex::new(&format!(r"(?i)cid:{}", regex::escape(clean_cid))) {
+            html = re.replace_all(&html, &data_uri).into_owned();
+        }
     }
 
     Some(html)

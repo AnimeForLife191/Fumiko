@@ -60,7 +60,7 @@ pub fn sanitize_html(raw: &str) -> String {
             "article", "header", "footer", "pre", "code"
         ])
         .add_generic_attributes(&["style", "class", "id", "align", "valign", "bgcolor", "width", "height"])
-        .add_tag_attributes("a", &["href", "target", "title"])
+        .add_tag_attributes("a", &["href", "title"])
         .add_tag_attributes("img", &["src", "alt", "width", "height", "style", "srcset", "sizes", "border"])
         .add_tag_attributes("table", &["cellpadding", "cellspacing", "border", "width", "bgcolor", "align"])
         .add_tag_attributes("td", &["colspan", "rowspan", "nowrap", "width", "height", "bgcolor", "align", "valign"])
@@ -76,7 +76,7 @@ pub fn sanitize_html(raw: &str) -> String {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <base target="_blank">
+    <base target="_top">
     <!-- Preserved Email Styles -->
     <style>
         {extracted_styles}

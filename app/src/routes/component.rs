@@ -1,8 +1,10 @@
+use common::Provider;
 use dioxus::prelude::*;
 use email_core::{EmailProvider, GmailProvider, OutlookProvider};
 use oauth::get_access_token_for_account;
 use self_update::VersionStatus;
 use storage::Storage;
+use storage::models::{EmailRow, LinkedAccount};
 use uuid::Uuid;
 use crate::{updater, AppState};
 use crate::utils::sanitize_html;
@@ -19,6 +21,29 @@ pub fn EmptyState(
             p { class: "empty-state__title", "{title}" }
             if let Some(sub) = subtitle {
                 p { class: "empty-state__hint", "{sub}" }
+            }
+        }
+    }
+}
+
+fn build_webmail_url(account: &LinkedAccount, email: &EmailRow) -> Option<String> {
+    match account.provider {
+        Provider::Gmail => {
+            Some(format!(
+                "https://mail.google.com/mail/?authuser={}#all/{}",
+                urlencoding::encode(&account.email_address),
+                email.provider_message_id
+            ))
+        }
+        Provider::Outlook => {
+            let encoded_id = urlencoding::encode(&email.provider_message_id);
+            if account.email_address.ends_with("@outlook.com")
+                || account.email_address.ends_with("@hotmail.com")
+                || account.email_address.ends_with("@live.com")
+            {
+                Some(format!("https://outlook.live.com/mail/deeplink/read/{encoded_id}"))
+            } else {
+                Some(format!("https://outlook.office.com/mail/deeplink/read/{encoded_id}"))
             }
         }
     }
@@ -66,10 +91,9 @@ pub fn ReadingPane(
                     .await
                     .map_err(|e| e.to_string())?;
 
-                let provider: Box<dyn EmailProvider> = match account.provider.as_str() {
-                    "gmail" => Box::new(GmailProvider::new(client)),
-                    "outlook" => Box::new(OutlookProvider::new(client)),
-                    other => return Err(format!("unsupported provider: {other}")),
+                let provider: Box<dyn EmailProvider> = match account.provider {
+                    Provider::Gmail => Box::new(GmailProvider::new(client)),
+                    Provider::Outlook => Box::new(OutlookProvider::new(client)),
                 };
 
                 let full_message = provider
@@ -77,7 +101,7 @@ pub fn ReadingPane(
                     .await
                     .map_err(|e| e.to_string())?;
 
-                Ok::<_, String>((email, full_message))
+                Ok::<_, String>((account, email, full_message))
             }
         }
     });
@@ -95,40 +119,56 @@ pub fn ReadingPane(
             }
 
             match &*email_data.read() {
-                Some(Ok((email, full_message))) => rsx! {
-                    div { class: "reading-pane__header",
-                        h2 { class: "reading-pane__title",
-                            "{email.subject.clone().unwrap_or_else(|| \"(No subject)\".to_string())}"
-                        }
-                        p { class: "reading-pane__sender",
-                            "From: {email.sender.clone().unwrap_or_else(|| \"(Unknown sender)\".to_string())}"
-                        }
-                    }
+                Some(Ok((account, email, full_message))) => {
+                    let webmail_url = build_webmail_url(account, email);
 
-                    div { class: "reading-pane__body",
-                        if let Some(html) = &full_message.body_html {
-                            iframe {
-                                id: "email-body-frame",
-                                class: "email-body__frame",
-                                srcdoc: "{sanitize_html(html)}",
-                                "sandbox": "allow-same-origin",
+                    rsx! {
+                        div { class: "reading-pane__header",
+                            div { class: "reading-pane__header-top",
+                                h2 { class: "reading-pane__title",
+                                    "{email.subject.clone().unwrap_or_else(|| \"(No subject)\".to_string())}"
+                                }
+                                if let Some(url) = webmail_url {
+                                    button {
+                                        class: "reading-pane__webmail-btn",
+                                        title: "Open this email in your browser",
+                                        onclick: move |_| {
+                                            let _ = webbrowser::open(&url);
+                                        },
+                                        "Open in Webmail ↗"
+                                    }
+                                }
                             }
-                        } else if let Some(text) = &full_message.body_text {
-                            pre { class: "email-body-text", "{text}" }
-                        } else {
-                            p { "(no content)" }
-                        }
-                    }
-
-                    if !full_message.attachments.is_empty() {
-                        div { class: "reading-pane__attachments",
-                            h3 { "Attachments" }
-                            for attachment in &full_message.attachments {
-                                div { class: "reading-pane__attachment", "{attachment.filename} ({attachment.size} bytes)" }
+                            p { class: "reading-pane__sender",
+                                "From: {email.sender.clone().unwrap_or_else(|| \"(Unknown sender)\".to_string())}"
                             }
                         }
+
+                        div { class: "reading-pane__body",
+                            if let Some(html) = &full_message.body_html {
+                                iframe {
+                                    id: "email-body-frame",
+                                    class: "email-body__frame",
+                                    srcdoc: "{sanitize_html(html)}",
+                                    "sandbox": "allow-same-origin allow-top-navigation-by-user-activation",
+                                }
+                            } else if let Some(text) = &full_message.body_text {
+                                pre { class: "email-body-text", "{text}" }
+                            } else {
+                                p { "(no content)" }
+                            }
+                        }
+
+                        if !full_message.attachments.is_empty() {
+                            div { class: "reading-pane__attachments",
+                                h3 { "Attachments" }
+                                for attachment in &full_message.attachments {
+                                    div { class: "reading-pane__attachment", "{attachment.filename} ({attachment.size} bytes)" }
+                                }
+                            }
+                        }
                     }
-                },
+                }
                 Some(Err(e)) => rsx! {
                     div { class: "reading-pane__state reading-pane__state--error", "Failed to load email: {e}" }
                 },

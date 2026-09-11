@@ -30,7 +30,7 @@ struct OllamaOptions {
 struct OllamaGenerateRequest<'a> {
     model: &'a str,
     prompt: &'a str,
-    format: &'a str,
+    format: serde_json::Value,
     stream: bool,
     /// Keep loaded for 1 minute of inactivity instead of the default 5 minutes
     keep_alive: &'a str,
@@ -61,7 +61,15 @@ pub struct OllamaClassifier {
 impl OllamaClassifier {
     /// Creates a new `OllamaClassifier` targeting the specified local model tag.
     pub fn new(http_client: ReqwestClient, model: String) -> Self {
-        Self { http_client, model }
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(90))
+            .build()
+            .unwrap_or(http_client);
+
+        Self { 
+            http_client: client, 
+            model 
+        }
     }
 
     /// Evaluates an email using Tier 1 lightweight metadata (subject, sender, and preview snippet).
@@ -101,10 +109,20 @@ impl OllamaClassifier {
     }
 
     async fn run_classification(&self, prompt: &str) -> Result<Option<Classification>, BoxError> {
+        let schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "matched": { "type": "boolean" },
+                "criterion_label": { "type": "string" },
+                "confidence": { "type": "number" }
+            },
+            "required": ["matched", "criterion_label", "confidence"]
+        });
+
         let request = OllamaGenerateRequest {
             model: &self.model,
             prompt,
-            format: "json",
+            format: schema,
             stream: false,
             keep_alive: "1m", // Unloads model after 1 minute of inactivity
             options: OllamaOptions {

@@ -123,19 +123,22 @@ impl GmailProvider {
             });
         };
 
-        // MIME tree extraction: text/plain and text/html nodes can reside at any depth in multipart trees.
-        let body_text = match find_part(&payload, "text/plain") {
+        let body_html = match find_part(&payload, "text/html") {
             Some(part) => {
                 extract_part_content(&self.http_client, access_token, message_id, part).await?
             }
             None => None,
         };
 
-        let body_html = match find_part(&payload, "text/html") {
+        // MIME tree extraction: text/plain and text/html nodes can reside at any depth in multipart trees.
+        let body_text = match find_part(&payload, "text/plain") {
             Some(part) => {
                 extract_part_content(&self.http_client, access_token, message_id, part).await?
             }
-            None => None,
+            None => body_html
+                .as_ref()
+                .and_then(|html| html2text::from_read(html.as_bytes(), 80)
+                .ok())
         };
 
         let mut attachments = Vec::new();
@@ -309,7 +312,7 @@ impl EmailProvider for GmailProvider {
 
                     if let Some(labels_removed) = record.labels_removed {
                         for label_removed in labels_removed {
-                            if label_removed.label_ids.iter().any(|l| l == "TRASH") {
+                            if label_removed.label_ids.iter().any(|l| l == "TRASH" || l == "SPAM") {
                                 restored_message_ids.push(label_removed.message.id);
                             }
                         }
