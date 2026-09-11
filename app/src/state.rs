@@ -1,6 +1,7 @@
 use common::Provider;
 use dioxus::prelude::*;
 use storage::models::LinkedAccount;
+use email_core::SyncProgress;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
@@ -33,6 +34,7 @@ pub struct AppState {
     pub auth_tx: Signal<AuthRequestSender>,
     pub is_linking: Signal<bool>,
     pub linking_status: Signal<String>,
+    pub sync_progress: Signal<Option<SyncProgress>>,
 }
 
 impl AppState {
@@ -49,6 +51,7 @@ impl AppState {
             auth_tx: Signal::new(auth_tx),
             is_linking: Signal::new(false),
             linking_status: Signal::new(String::new()),
+            sync_progress: Signal::new(None),
         }
     }
 }

@@ -6,6 +6,10 @@
 }
 
 .dashboard__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
     margin-bottom: 24px;
 }
 
@@ -24,6 +28,53 @@
     margin: 6px 0 0;
     color: var(--text-secondary);
     font-size: 14px;
+}
+
+/* ==========================================================================
+   Live Sync & AI Classification Progress Badge
+   ========================================================================== */
+   
+.dashboard__sync-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 6px 14px;
+    border: 1px solid var(--border-bright);
+    border-radius: var(--radius-pill);
+    background: linear-gradient(135deg, var(--accent-primary-subtle), var(--bg-surface-raised));
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 650;
+    letter-spacing: 0.01em;
+    box-shadow: 0 0 16px var(--accent-primary-glow);
+    user-select: none;
+    backdrop-filter: blur(12px);
+    animation: sync-badge-pulse 2.4s infinite ease-in-out;
+}
+
+.dashboard__sync-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: var(--radius-pill);
+    background-color: var(--accent-success);
+    box-shadow: 0 0 8px var(--accent-success-glow);
+    animation: sync-dot-blink 1.2s infinite ease-in-out;
+}
+
+@keyframes sync-badge-pulse {
+    0%, 100% {
+        border-color: var(--border-subtle);
+        box-shadow: 0 0 8px var(--accent-primary-subtle);
+    }
+    50% {
+        border-color: var(--border-bright);
+        box-shadow: 0 0 20px var(--accent-primary-glow);
+    }
+}
+
+@keyframes sync-dot-blink {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.35; transform: scale(0.85); }
 }
 
 /* ==========================================================================

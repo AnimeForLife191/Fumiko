@@ -9,7 +9,7 @@ mod sync_page;
 
 pub use email_providers::{GmailProvider, OutlookProvider};
 pub use linking::{link_gmail_account, link_outlook_account};
-pub use sync_page::{SyncCursor, SyncOptions, SyncPage, SyncService};
+pub use sync_page::{SyncCursor, SyncOptions, SyncPage, SyncService, SyncProgress, SyncPhase};
 
 use common::ProviderError;
 

@@ -10,6 +10,7 @@ use local_ai::{Criterion, OllamaClassifier};
 use oauth::{OAuthProvider, get_access_token_for_account};
 use reqwest::Client as ReqwestClient;
 use storage::{Storage, models::LinkedAccount};
+use tokio::sync::mpsc::UnboundedSender;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
@@ -53,11 +54,26 @@ impl Default for SyncOptions {
     }
 }
 
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SyncPhase {
+    Hydrating,
+    Classifying,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SyncProgress {
+    pub current: usize,
+    pub total: usize,
+    pub phase: SyncPhase,
+}
+
 /// Coordinates mailbox synchronization, token lifecycle caching, and background AI classification.
 pub struct SyncService {
     pub storage: Storage,
     pub http_client: ReqwestClient,
     token_cache: Mutex<HashMap<Uuid, (String, Instant)>>,
+    pub progress_tx: Option<UnboundedSender<SyncProgress>>
 }
 
 impl SyncService {
@@ -67,6 +83,18 @@ impl SyncService {
             storage,
             http_client,
             token_cache: Mutex::new(HashMap::new()),
+            progress_tx: None
+        }
+    }
+
+    pub fn with_progress_sender(mut self, tx: UnboundedSender<SyncProgress>) -> Self {
+        self.progress_tx = Some(tx);
+        self
+    }
+
+    fn report_progress(&self, current: usize, total: usize, phase: SyncPhase) {
+        if let Some(tx) = &self.progress_tx {
+            let _ = tx.send(SyncProgress { current, total, phase });
         }
     }
 
@@ -191,11 +219,14 @@ impl SyncService {
         let mut fetch_errors_occurred = false;
 
         if !page.new_message_ids.is_empty() {
+            let total = page.new_message_ids.len();
+            self.report_progress(0, total, SyncPhase::Hydrating);
+
             let metadata = provider
                 .fetch_message_metadata(&access_token, &page.new_message_ids)
                 .await?;
 
-            for result in metadata {
+            for (idx, result) in metadata.into_iter().enumerate() {
                 match result {
                     Ok(m) => {
                         let email_id = self
@@ -221,6 +252,8 @@ impl SyncService {
                         fetch_errors_occurred = true;
                     }
                 }
+                
+                self.report_progress(idx + 1, total, SyncPhase::Hydrating);
             }
         }
 
@@ -349,6 +382,13 @@ impl SyncService {
         let classifier = OllamaClassifier::new(self.http_client.clone(), model);
         let tier2_budget = Arc::new(AtomicUsize::new(MAX_TIER2_FETCHES_PER_SYNC));
 
+        let total_emails = emails.len();
+        let completed_count  = Arc::new(AtomicUsize::new(0));
+
+        self.report_progress(0, total_emails, SyncPhase::Classifying);
+
+        let progress_tx = self.progress_tx.clone();
+
         // Bounded concurrency (up to 4 inferences in parallel) prevents overwhelming the local Ollama daemon.
         stream::iter(emails)
             .for_each_concurrent(4, |(email_id, provider_message_id, subject, sender, snippet)| {
@@ -356,6 +396,8 @@ impl SyncService {
                 let criteria = &criteria;
                 let active_criteria = &active_criteria;
                 let tier2_budget = tier2_budget.clone();
+                let completed_count = completed_count.clone();
+                let progress_tx = progress_tx.clone();
 
                 async move {
                     // Step 1: Run fast Tier 1 classification (Subject + Sender + Snippet).
@@ -475,6 +517,16 @@ impl SyncService {
                                 .timeout(notify_rust::Timeout::Milliseconds(6000))
                                 .show();
                         }
+                    }
+
+                    // Increment progress and report to UI
+                    let current = completed_count.fetch_add(1, Ordering::SeqCst) + 1;
+                    if let Some(tx) = &progress_tx {
+                        let _ = tx.send(SyncProgress { 
+                            current, 
+                            total: total_emails, 
+                            phase: SyncPhase::Classifying 
+                        });
                     }
                 }
             })

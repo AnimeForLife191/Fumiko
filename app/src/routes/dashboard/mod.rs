@@ -1,5 +1,6 @@
 use dioxus::prelude::*;
 use storage::{Storage, models::MatchedEmailWithReason};
+use email_core::SyncPhase;
 use uuid::Uuid;
 
 use super::component::EmptyState;
@@ -93,8 +94,30 @@ pub fn Dashboard() -> Element {
     rsx! {
         div { class: "dashboard",
             div { class: "dashboard__header",
-                h1 { class: "dashboard__title", "Dashboard" }
-                p { class: "dashboard__subtitle", "Your email and AI findings overview" }
+                div {
+                    h1 { class: "dashboard__title", "Dashboard" }
+                    p { class: "dashboard__subtitle", "Your email and AI findings overview" }
+                }
+
+                if (state.is_syncing)() {
+                    div { class: "dashboard__sync-badge",
+                        span { class: "dashboard__sync-dot" }
+                        if let Some(progress) = (state.sync_progress)() {
+                            span {
+                                match progress.phase {
+                                    SyncPhase::Hydrating => {
+                                        format!("Downloading headers ({}/{})...", progress.current, progress.total)
+                                    }
+                                    SyncPhase::Classifying => {
+                                        format!("AI evaluating emails ({}/{})...", progress.current, progress.total)
+                                    }
+                                }
+                            }
+                        } else {
+                            span { "Checking for new mail..." }
+                        }
+                    }
+                }
             }
 
             // Stat Cards

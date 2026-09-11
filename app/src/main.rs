@@ -13,20 +13,17 @@ use dioxus::{
     prelude::*,
 };
 use std::{collections::HashMap, sync::OnceLock, time::Duration};
-use common::{APP_SERVICE_NAME, setting_keys::POLL_INTERVAL_SECS};
-use email_core::SyncService;
-use storage::{Storage, init_pool};
 use tokio::sync::mpsc;
 use tracing::error;
 use uuid::Uuid;
 
+use email_core::{SyncProgress, SyncService, link_gmail_account, link_outlook_account};
+use common::{APP_SERVICE_NAME, setting_keys::POLL_INTERVAL_SECS};
+use storage::{Storage, init_pool};
+use state::{AuthCommand, AppState, SyncTarget};
 use routes::{AddAccount, Dashboard, Findings, Inbox, Layout, Settings, Trash};
-use state::SyncTarget;
 use tray::use_system_tray;
 use utils::load_custom_css;
-
-use email_core::{link_gmail_account, link_outlook_account};
-use state::{AuthCommand, AppState};
 
 const ALL_CSS: &str = concat!(
     include_str!("../assets/css/default/shared.css"), "\n",
@@ -162,13 +159,22 @@ fn Fumiko() -> Element {
                 .take()
                 .expect("Sync worker has already been initialized");
 
+            let (progress_tx, mut progress_rx) = mpsc::unbounded_channel::<SyncProgress>();
+
+            spawn(async move {
+                while let Some(progress) = progress_rx.recv().await {
+                    state.sync_progress.set(Some(progress));
+                }
+            });
+
             spawn(async move {
                 let http_client = reqwest::Client::new();
 
                 while let Some(target) = sync_rx.recv().await {
                     state.is_syncing.set(true);
 
-                    let sync_service = SyncService::new(storage.clone(), http_client.clone());
+                    let sync_service = SyncService::new(storage.clone(), http_client.clone())
+                        .with_progress_sender(progress_tx.clone());
 
                     let result = match target {
                         SyncTarget::One(account_id) => sync_service.sync_account(account_id).await,
@@ -182,6 +188,7 @@ fn Fumiko() -> Element {
                     state.refresh_trigger.with_mut(|n| *n += 1);
                     state.sync_tick.with_mut(|n| *n += 1);
                     state.is_syncing.set(false);
+                    state.sync_progress.set(None);
                 }
             });
 
