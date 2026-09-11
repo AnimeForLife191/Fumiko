@@ -76,12 +76,12 @@ pub(crate) fn build_oauth_client(
 /// validates the CSRF state in constant time, and exchanges the authorization code for tokens.
 ///
 /// # Invariants & Security
-/// - The local listener runs strictly on `127.0.0.1` and enforces a 60-second overall timeout.
+/// - The local listener runs strictly on `127.0.0.1` and enforces a 120-second overall timeout.
 /// - Unrelated network traffic (such as favicon requests or port scans) is served a 404 and discarded
 ///   without terminating the waiting listener.
 ///
 /// # Errors
-/// Returns [`OAuthError::CallbackTimeout`] if the user does not finish within 60 seconds,
+/// Returns [`OAuthError::CallbackTimeout`] if the user does not finish within 120 seconds,
 /// [`OAuthError::AccessDenied`] if the user cancels on the consent screen, or
 /// [`OAuthError::CsrfMismatch`] if the returned state token does not match the request.
 pub async fn run_oauth(
@@ -135,7 +135,7 @@ pub async fn run_oauth(
 
     tokio::pin!(callback_task);
 
-    let callback_result = tokio::time::timeout(Duration::from_secs(60), &mut callback_task).await;
+    let callback_result = tokio::time::timeout(Duration::from_secs(120), &mut callback_task).await;
 
     let (code, returned_state) = match callback_result {
         Ok(Ok(inner)) => {

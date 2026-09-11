@@ -4,7 +4,7 @@ The `app` crate serves as the presentation and orchestration layer for Fumiko. B
 
 Unlike a standard web frontend, a desktop email watcher operates as a persistent daemon. It must coordinate background inbox polling, manage operating system lifecycles (system tray, window visibility, native keyrings), safely render arbitrary third-party HTML, and manage on-device LLM downloads, all while keeping the UI responsive.
 
-This document details the architecture of the `app` crate, explains our reactive state and worker model, breaks down our HTML sanitization pipeline, and outlines the frontend invariants we maintain.
+This document details the architecture of the `app` crate, explains our reactive state and worker model, breaks down our HTML sanitization and link execution pipeline, and outlines our frontend invariants.
 
 ---
 
@@ -12,8 +12,9 @@ This document details the architecture of the `app` crate, explains our reactive
 
 Desktop webview applications face several engineering challenges that standard web apps do not:
 
-* **Route Navigation Tearing**: In component-based frameworks, navigating between views unmounts component trees. If an OAuth handshake or background sync is tied to a specific route component (like `AddAccount`), navigating back to the dashboard will abort the future and leave network sockets hanging.
+* **Route Navigation Tearing**: In component-based UI frameworks, navigating between views unmounts component trees. If an OAuth handshake or background sync is tied to a specific route component (like `AddAccount`), navigating back to the dashboard will abort the future and leave local network sockets hanging.
 * **Task Leaks from Background Polling**: Spawning unmanaged background loops to poll email accounts causes task leaks when accounts are deleted, leading to ghost sync passes and wasted provider API quotas.
+* **The Webview Link Trap**: Desktop webview engines (Wry, WebKit, WebView2) disable new window popups by default. Clicking ordinary email links with `target="_blank"` silently fails. Conversely, allowing unvetted link navigation can cause the entire desktop app window to navigate away to a third-party website.
 * **The Email Sanitization Dilemma**: Naive HTML sanitizers strip all `<style>` elements, destroying email layouts, receipts, and invoices. Leaving styles unvetted, however, exposes the desktop webview to CSS data exfiltration (`@import`) and script injection (`javascript:` expressions).
 * **Accidental Process Termination**: If closing the application window terminates the binary, background inbox monitoring stops completely, defeating the purpose of an email watcher.
 * **Orphaned Configuration References**: Deleting an installed local AI model from disk while leaving it marked as the active classifier in SQLite causes background sync jobs to fail silently.
@@ -25,15 +26,15 @@ Desktop webview applications face several engineering challenges that standard w
 
 Fumiko uses Dioxus `Router` with an overarching `Layout` component that maintains a fixed 250px sidebar, account filter controls, and an animated top update banner:
 
-* **Dashboard (`Dashboard`)**: Displays true mailbox stats (unread, findings, total counts queried from SQLite), a 5-item preview of recent messages and findings, and active watch criteria toggle switches.
-* **Inbox (`Inbox`)**: A responsive split-view interface (`minmax(340px, 400px) minmax(0, 1fr)`). The left pane displays a 3-tier email list with a manual sync trigger; the right pane displays the active `ReadingPane`.
-* **Findings Board (`Findings`)**: A prioritized stream of emails that matched user-defined watch criteria. Displays model confidence percentages, with instant "Clear Match" and "Delete" triage buttons.
+* **Dashboard (`Dashboard`)**: Displays true mailbox stats (unread, findings, and total counts queried from SQLite), a 5-item preview of recent messages and findings, and active watch criteria toggle switches.
+* **Inbox (`Inbox`)**: A responsive split-view interface (`minmax(340px, 400px) minmax(0, 1fr)`). The left pane displays a 3-tier email list with an instant sync trigger; the right pane displays the active `ReadingPane`.
+* **Findings Board (`Findings`)**: A prioritized stream of emails that matched user-defined watch criteria. Displays model confidence percentages, with instant "Clear" and "Delete" triage buttons.
 * **Trash (`Trash`)**: Displays soft-deleted emails with timestamps and an instant "Restore" action.
 * **Add Account (`AddAccount`)**: Guides provider selection (Gmail or Outlook), displays real-time connection status, and houses the `Credentials` component for custom developer keys.
 * **Settings (`Settings`)**: Divided into five focused submodules:
   * `LinkedAccountsSection`: Displays connected accounts with inline editable names (`EditableAccountName`), error indicators, and deletion actions.
   * `TrashRetentionSection`: Configures automatic trash retention periods (7 to 365 days).
-  * `AiSelection`: Supervises the local Ollama daemon, lists installed vs. pullable models, streams download progress, and manages active model selection.
+  * `AiSelection`: Supervises the local Ollama daemon, lists installed vs pullable models, streams download progress, and manages active model selection.
   * `WatchCriteriaSection`: CRUD management for user-defined classification rules.
   * `DangerZoneSection`: Two-step confirmation dialog that executes `storage.wipe_all_data()`.
 
@@ -48,7 +49,7 @@ Fumiko decouples persistent relational storage (SQLite) from ephemeral UI state 
 * `accounts`: Cached vector of active `LinkedAccount` rows.
 * `selected_account`: Global account filter pointer (`None` represents "All Accounts").
 * `selected_email`: Currently active email UUID for split-view reading.
-* `is_syncing` & `is_linking`: Boolean flags that drive loading spinners and disable conflicting trigger buttons.
+* `is_syncing` and `is_linking`: Boolean flags that drive loading spinners and disable conflicting trigger buttons.
 * `refresh_trigger`: Global invalidation counter. Bumping this signal invalidates downstream `use_resource` hooks across all screens, triggering clean database re-queries.
 * `sync_tick`: Counter bumped whenever background sync passes finish, refreshing timestamps and mailbox stats.
 
@@ -84,7 +85,7 @@ The sync worker serializes sync requests received over `sync_channel`:
 
 ---
 
-## Lazy Message Loading and HTML Sanitization
+## Lazy Message Loading, HTML Sanitization, and Link Handling
 
 ### Lazy Full-Message Retrieval
 To keep mailbox lists lightweight and save local bandwidth, message bodies and raw MIME attachments are not downloaded during background sync. 
@@ -92,15 +93,28 @@ To keep mailbox lists lightweight and save local bandwidth, message bodies and r
 In `ReadingPane`:
 1. When a user clicks an email, `use_resource` queries SQLite for the message headers and account record.
 2. It requests fresh access credentials via `get_access_token_for_account`.
-3. The dynamic `EmailProvider` trait fetches the full payload (`fetch_full_message`) on-demand.
+3. The dynamic `EmailProvider` trait fetches the full payload (`fetch_full_message`) on demand.
 4. Once fetched, the email is marked as viewed in storage, and `refresh_trigger` is bumped to update read status badges across the UI.
 
-### The Three-Stage Sanitization Pipeline (`utils::sanitize_html`)
-Rendering untrusted HTML emails in a desktop webview presents severe security risks. Fumiko implements a three-stage sanitization pipeline:
+### Direct Webmail Triage ("Open in Webmail")
+Because Fumiko uses read-only scopes to build trust, users cannot reply to emails directly inside the app. To streamline triage, `ReadingPane` provides an instant "Open in Webmail" button:
+* **Gmail**: Constructs a direct deep link: `https://mail.google.com/mail/?authuser={email}#all/{provider_message_id}`. Using `authuser` guarantees Google opens the correct profile even if the user is signed into multiple Google accounts in their browser.
+* **Outlook**: Constructs a deep link targeting `outlook.live.com` for personal accounts or `outlook.office.com` for corporate accounts, URL-encoding the provider message identifier.
+* Clicking the button calls `webbrowser::open()` to launch the specific message directly in the user's default browser.
+
+### The Three-Stage Sanitization and Link Pipeline
+Rendering untrusted HTML emails in a desktop webview presents severe security risks. Fumiko implements a three-stage pipeline:
 
 1. **Regex Style Extraction and Cleanse**: Before Ammonia strips `<style>` elements, a regular expression extracts all style blocks. `javascript:` protocol strings are purged, and `@import` directives are commented out to prevent CSS-based data exfiltration.
-2. **Ammonia Structural Sanitization**: The body markup is filtered through `ammonia::Builder`. Permitted URL schemes are restricted to `data`, `cid`, `http`, `https`, `mailto`, and `tel`. All `<script>`, `<object>`, `<embed>`, and `<iframe>` elements are stripped, and inline event handlers (`onload`, `onclick`) are purged. Hyperlinks receive `rel="noopener noreferrer"` and `target="_blank"`.
-3. **Sandboxed Document Reassembly**: The sanitized body and cleaned styles are reassembled into an HTML5 document. The wrapper enforces an explicit `#ffffff` background and dark text resets to prevent contrast inversion bugs in dark mode. The markup is rendered inside an isolated iframe with `sandbox="allow-same-origin"`.
+2. **Ammonia Structural Sanitization**: The body markup is filtered through `ammonia::Builder`. Permitted URL schemes are restricted to `data`, `cid`, `http`, `https`, `mailto`, and `tel`. All `<script>`, `<object>`, `<embed>`, and `<iframe>` elements are stripped, and inline event handlers (`onload`, `onclick`) are purged. Crucially, any hardcoded `target` attribute on anchor tags is stripped, forcing links to inherit our document base.
+3. **Sandboxed Reassembly and External Link Routing**:
+   * The sanitized markup is injected into an isolated document wrapper with `<base target="_top">`.
+   * The markup renders inside an `<iframe>` configured with:
+     ```
+     sandbox="allow-same-origin allow-top-navigation-by-user-activation"
+     ```
+   * When a user clicks a link inside the email, the iframe permits the navigation because it was initiated by a user click.
+   * Dioxus desktop's `.with_navigation_handler()` intercepts the request before the webview navigates. If the URL starts with `http://`, `https://`, or `mailto:`, it launches the default operating system browser via `webbrowser::open()` and returns `false`. This allows external links to open smoothly without letting third-party pages replace the Fumiko application interface.
 
 ---
 
@@ -144,10 +158,11 @@ Fumiko includes an in-place binary update pipeline powered by `self_update`:
 
 ## Frontend Architecture Checklist
 
-When adding new views, modifying state hooks, or altering desktop integration, ensure these invariants remain intact:
+When adding new views, modifying state hooks, or altering desktop integration, ensure these rules remain intact:
 
 * Keep Async Workers in Root Scope: Never attach long-lived communication channels or worker loops to individual route components.
 * Supervise Watcher Tasks: Always cancel and drop background polling handles when an account is removed from storage.
+* Route Links to the System Browser: Pair `<base target="_top">` and `allow-top-navigation-by-user-activation` with `with_navigation_handler` so external links launch the default browser without navigating the desktop window.
 * Always Route HTML Through `sanitize_html`: Never inject raw, unsanitized email strings directly into the DOM or webview.
 * Never Allow Unchecked `@import` in Email CSS: Ensure the style extraction pass neutralizes `@import` and `javascript:` before re-inserting CSS blocks.
 * Clean Up Active Model Settings on Uninstall: Clear `ACTIVE_AI_MODEL_ID` in storage whenever the currently active model is deleted.
