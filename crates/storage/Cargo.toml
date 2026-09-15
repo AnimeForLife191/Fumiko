@@ -6,10 +6,12 @@ edition = "2024"
 [dependencies]
 common.workspace = true
 
-tempfile = "3.27.0"
 sqlx.workspace = true
 keyring.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
 serde.workspace = true
 tokio.workspace = true
+
+[dev-dependencies]
+tempfile = "3.27.0"

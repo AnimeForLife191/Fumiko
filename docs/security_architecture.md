@@ -4,8 +4,6 @@ Security in Fumiko is about limiting what the application can receive, where sen
 
 This document describes the security model for the desktop application, explains our threat boundaries, and highlights the rules that must remain in place as the project grows.
 
----
-
 ## What We Are Protecting
 
 The most sensitive values in the application lifecycle are:
@@ -20,8 +18,6 @@ The most sensitive values in the application lifecycle are:
 A nearby local process, a compromised log file, or an accidental database backup should not be enough to obtain long-lived access to a user mailbox.
 
 No design can protect a machine that is already fully compromised at the root level. The goal is to reduce exposure, reject forged or unrelated callbacks, prevent timing leaks, and avoid turning ordinary database or log files into credential dumps.
-
----
 
 ## Loopback Callback and Local Network Boundaries
 
@@ -39,8 +35,6 @@ Because the listener runs locally, rogue local processes or background port scan
 ### Numeric IP Routing Over Localhost
 The callback listener binds to `127.0.0.1` and constructs redirect URIs using the explicit IPv4 loopback address. Many operating systems resolve the word `localhost` to the IPv6 address `::1` first. Using `127.0.0.1` prevents modern browsers from failing with connection refused errors when attempting IPv6 loopback routing.
 
----
-
 ## Cryptographic Protections in Transit
 
 ### PKCE Protects the Code Exchange
@@ -52,8 +46,6 @@ When Fumiko exchanges the authorization code for tokens, the provider requires t
 Each authorization request creates a random state token. The provider echoes that value back with the redirect, and Fumiko validates it before accepting the authorization code.
 
 State comparison uses constant-time byte validation rather than standard short-circuiting string comparisons. This eliminates microarchitectural timing side channels that could leak state token bytes. State tokens are single-use, request-specific, and never written to persistent logs.
-
----
 
 ## Credential Storage and Secret Lifecycle
 
@@ -72,8 +64,6 @@ Refresh tokens and custom OAuth client secrets require stronger protection. Fumi
 ### Redacted Debug Formatting
 Data structures that hold credentials (`RawCredentials` and `TokenSet`) implement custom `fmt::Debug` formatters that explicitly replace secrets with `[REDACTED]`. This guarantees that diagnostics or error logging macros cannot accidentally dump plaintext tokens into log files.
 
----
-
 ## Webview and Rendering Security
 
 Rendering untrusted third-party HTML emails in a desktop application presents cross-site scripting (XSS) and data exfiltration risks. Fumiko isolates email content using a multi-layer pipeline:
@@ -91,9 +81,9 @@ The HTML markup is sanitized through Ammonia:
 ### 3. Sandboxed Iframes and Navigation Trapping
 Sanitized email markup is rendered inside an isolated `<iframe>` with `<base target="_top">` and strict sandbox flags:
 
-sandbox="allow-same-origin allow-top-navigation-by-user-activation"
-code Code
-
+```html
+<iframe sandbox="allow-same-origin allow-top-navigation-by-user-activation"></iframe>
+```
 * JavaScript execution and forms remain completely disabled inside the frame.
 * When a user clicks a link, the click is permitted to navigate the top-level browsing context.
 * Dioxus desktop's `.with_navigation_handler()` intercepts the navigation before the webview loads it. If the link targets an external protocol (`http://`, `https://`, or `mailto:`), it launches the user's default system browser via `webbrowser::open()` and returns `false`. This prevents external websites from ever loading inside or replacing the Fumiko desktop application window.

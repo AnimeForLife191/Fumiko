@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+env:
+  # Pinned llama.cpp version for reproducible CI builds
+  LLAMA_TAG: "b10920"
+
 jobs:
   build:
     name: Build ${{ matrix.platform_name }}
@@ -21,12 +25,21 @@ jobs:
             platform_name: Windows
             archive_name: fumiko-x86_64-pc-windows-msvc.zip
             target_os: windows
+            llama_asset: "bin-win-vulkan-x64.zip"
 
           # Linux GNU Build
           - os: ubuntu-latest
             platform_name: Linux
             archive_name: fumiko-x86_64-unknown-linux-gnu.tar.gz
             target_os: linux
+            llama_asset: "bin-ubuntu-vulkan-x64.tar.gz"
+
+          # macOS Apple Silicon Build
+          - os: macos-14
+            platform_name: macOS (Apple Silicon)
+            archive_name: fumiko-aarch64-apple-darwin.tar.gz
+            target_os: macos
+            llama_asset: "bin-macos-arm64.tar.gz"
 
     steps:
       - name: Checkout repository
@@ -56,28 +69,118 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      # 4. Build directly with Cargo (CSS & assets are baked inside via include_str! / include_bytes!)
+      # 4. Build directly with Cargo
       - name: Build with Cargo
         env:
           MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
         run: cargo build --release --package fumiko
 
-      # 5. Package Windows (.zip containing standalone fumiko.exe)
+      # 5. Download and bundle pre-built llama-server sidecar (Linux)
+      - name: Bundle llama-server (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p target/release/bin llama_tmp
+          URL="https://github.com/ggml-org/llama.cpp/releases/download/${{ env.LLAMA_TAG }}/llama-${{ env.LLAMA_TAG }}-${{ matrix.llama_asset }}"
+          echo "Downloading $URL..."
+          curl -L -o llama.tar.gz "$URL"
+          tar -xzf llama.tar.gz -C llama_tmp
+          find llama_tmp -type f -name "llama-server" -exec cp {} target/release/bin/ \;
+          find llama_tmp -type f -name "*.so*" -exec cp {} target/release/bin/ \;
+          chmod +x target/release/bin/llama-server
+          rm -rf llama.tar.gz llama_tmp
+
+      # 6. Download and bundle pre-built llama-server sidecar (Windows)
+      - name: Bundle llama-server (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          mkdir -p target/release/bin llama_tmp
+          URL="https://github.com/ggml-org/llama.cpp/releases/download/${{ env.LLAMA_TAG }}/llama-${{ env.LLAMA_TAG }}-${{ matrix.llama_asset }}"
+          echo "Downloading $URL..."
+          curl -L -o llama.zip "$URL"
+          7z x llama.zip -ollama_tmp -y
+          find llama_tmp -type f -name "llama-server.exe" -exec cp {} target/release/bin/ \;
+          find llama_tmp -type f -name "*.dll" -exec cp {} target/release/bin/ \;
+          rm -rf llama.zip llama_tmp
+
+      # 7. Download and bundle pre-built llama-server sidecar (macOS)
+      - name: Bundle llama-server (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p target/release/bin llama_tmp
+          URL="https://github.com/ggml-org/llama.cpp/releases/download/${{ env.LLAMA_TAG }}/llama-${{ env.LLAMA_TAG }}-${{ matrix.llama_asset }}"
+          echo "Downloading $URL..."
+          curl -L -o llama.tar.gz "$URL"
+          tar -xzf llama.tar.gz -C llama_tmp
+          find llama_tmp -type f -name "llama-server" -exec cp {} target/release/bin/ \;
+          find llama_tmp -type f -name "*.dylib" -exec cp {} target/release/bin/ \;
+          chmod +x target/release/bin/llama-server
+          rm -rf llama.tar.gz llama_tmp
+
+      # 8. Package Windows (.zip containing fumiko.exe and bin/ sidecar folder)
       - name: Package Windows Release Archive
         if: runner.os == 'Windows'
         shell: bash
         run: |
           cd target/release
-          7z a "${{ github.workspace }}/${{ matrix.archive_name }}" fumiko.exe
+          7z a "${{ github.workspace }}/${{ matrix.archive_name }}" fumiko.exe bin
 
-      # 6. Package Linux (.tar.gz containing standalone fumiko binary)
+      # 9. Package Linux (.tar.gz containing fumiko and bin/ sidecar folder)
       - name: Package Linux Release Archive
         if: runner.os == 'Linux'
         run: |
           cd target/release
-          tar -czvf "${{ github.workspace }}/${{ matrix.archive_name }}" fumiko
+          tar -czvf "${{ github.workspace }}/${{ matrix.archive_name }}" fumiko bin
 
-      # 7. Upload Artifacts to GitHub Release
+      # 10. Package macOS (.app bundle inside .tar.gz with ad-hoc signature)
+      - name: Package macOS Release Archive
+        if: runner.os == 'macOS'
+        run: |
+          APP_NAME="Fumiko.app"
+          CONTENTS="$APP_NAME/Contents"
+          mkdir -p "$CONTENTS/MacOS"
+          mkdir -p "$CONTENTS/Resources/bin"
+
+          # 1. Copy main binary
+          cp target/release/fumiko "$CONTENTS/MacOS/"
+          chmod +x "$CONTENTS/MacOS/fumiko"
+
+          # 2. Copy sidecar binary and dylibs into Resources/bin (matches path.rs)
+          cp -r target/release/bin/* "$CONTENTS/Resources/bin/"
+          chmod +x "$CONTENTS/Resources/bin/llama-server"
+
+          # 3. Create Info.plist
+          cat << 'EOF' > "$CONTENTS/Info.plist"
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key>
+              <string>fumiko</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.shuharitech.fumiko</string>
+              <key>CFBundleName</key>
+              <string>Fumiko</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>0.2.0</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>11.0</string>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+
+          # 4. Ad-hoc code sign so Apple Silicon permits execution
+          codesign --force --deep -s - "$CONTENTS/Resources/bin/llama-server"
+          codesign --force --deep -s - "$APP_NAME"
+
+          # 5. Archive preserving Unix file permissions
+          tar -czvf "${{ github.workspace }}/${{ matrix.archive_name }}" "$APP_NAME"
+
+      # 11. Upload Artifacts to GitHub Release
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:

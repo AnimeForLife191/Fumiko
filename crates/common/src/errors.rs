@@ -76,8 +76,9 @@ pub enum TokenError {
     Credentials(#[from] CredentialError),
     #[error("OAuth request failed")]
     Request(#[source] BoxError),
-    #[error("account {0} has no stored refresh token")]
-    MissingRefreshToken(uuid::Uuid),
+    /// Replaced generic "MissingRefreshToken" to support both OAuth tokens and IMAP passwords
+    #[error("account {0} has no stored secret (refresh token or app password)")]
+    MissingAccountSecret(uuid::Uuid),
     #[error("unsupported provider: {0}")]
     UnsupportedProvider(String),
 }
@@ -86,8 +87,10 @@ pub enum TokenError {
 pub enum ProviderError {
     #[error("sync cursor expired - full resync is required")]
     CursorExpired,
-    #[error("access token expired or invalid")]
+    #[error("access token or credentials expired or invalid")]
     Unauthorized,
+    #[error("rate limited by provider (backoff requested)")]
+    RateLimited,
     #[error("invalid provider data: {0}")]
     InvalidData(String),
     #[error("network or provider error: {0}")]
@@ -98,6 +101,8 @@ impl From<reqwest::Error> for ProviderError {
     fn from(e: reqwest::Error) -> Self {
         if e.status() == Some(reqwest::StatusCode::UNAUTHORIZED) {
             ProviderError::Unauthorized
+        } else if e.status() == Some(reqwest::StatusCode::TOO_MANY_REQUESTS) {
+            ProviderError::RateLimited
         } else {
             ProviderError::Other(Box::new(e))
         }
@@ -110,8 +115,8 @@ pub enum SyncError {
     Database(#[from] StorageError),
     #[error("account not found: {0}")]
     AccountNotFound(uuid::Uuid),
-    #[error("no stored refresh token for account {0} — account needs re-linking")]
-    MissingRefreshToken(uuid::Uuid),
+    #[error("no stored secret for account {0} — account needs re-linking")]
+    MissingAccountSecret(uuid::Uuid),
     #[error("provider error: {0}")]
     Provider(#[from] ProviderError),
     #[error("oauth error: {0}")]
@@ -124,7 +129,7 @@ impl From<TokenError> for SyncError {
     fn from(error: TokenError) -> Self {
         match error {
             TokenError::Storage(error) => Self::Database(error),
-            TokenError::MissingRefreshToken(account_id) => Self::MissingRefreshToken(account_id),
+            TokenError::MissingAccountSecret(account_id) => Self::MissingAccountSecret(account_id),
             TokenError::UnsupportedProvider(provider) => Self::UnsupportedProvider(provider),
             error => Self::OAuth(Box::new(error)),
         }

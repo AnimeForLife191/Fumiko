@@ -1,3 +1,5 @@
+//! Microsoft Graph API provider implementation supporting Graph Delta queries.
+
 mod models;
 mod parsing;
 
@@ -17,21 +19,22 @@ const GRAPH_BASE: &str = "https://graph.microsoft.com/v1.0";
 const MAX_INITIAL_SYNC_PAGES: usize = 200;
 const MAX_429_RETRIES: usize = 3;
 
-/// Microsoft Graph API client implementing the [`EmailProvider`] trait.
+/// Microsoft Graph API client implementing [`EmailProvider`].
 pub struct OutlookProvider {
     http_client: ReqwestClient,
 }
 
 impl OutlookProvider {
-    /// Creates a new `OutlookProvider` using the provided HTTP client.
+    /// Creates a new `OutlookProvider` with the supplied HTTP client.
     pub fn new(http_client: ReqwestClient) -> Self {
         Self { http_client }
     }
 
+    /// Dispatches an authenticated request, backing off exponentially on HTTP 429 Too Many Requests.
     async fn send_request_with_retry(
         &self,
         url: &str,
-        access_token: &str
+        access_token: &str,
     ) -> Result<reqwest::Response, ProviderError> {
         let mut attempts = 0;
 
@@ -43,7 +46,9 @@ impl OutlookProvider {
                 .send()
                 .await?;
 
-            if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS && attempts < MAX_429_RETRIES {
+            if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS
+                && attempts < MAX_429_RETRIES
+            {
                 attempts += 1;
 
                 let retry_after_secs = response
@@ -55,7 +60,7 @@ impl OutlookProvider {
 
                 let delay = Duration::from_secs(retry_after_secs.min(30));
                 tracing::warn!(
-                    "Graph API returned 429 Too Many Requests. Retrying in {delay:?} (attempt {attempts}/{MAX_429_RETRIES})"
+                    "Graph API 429 rate limit hit. Retrying in {delay:?} (attempt {attempts}/{MAX_429_RETRIES})"
                 );
 
                 tokio::time::sleep(delay).await;
@@ -66,15 +71,13 @@ impl OutlookProvider {
         }
     }
 
+    /// Fetches user profile data from `GET /me`.
     async fn fetch_profile(
         &self,
         access_token: &str,
     ) -> Result<OutlookProfileResponse, ProviderError> {
         let profile: OutlookProfileResponse = self
-            .http_client
-            .get(format!("{GRAPH_BASE}/me"))
-            .bearer_auth(access_token)
-            .send()
+            .send_request_with_retry(&format!("{GRAPH_BASE}/me"), access_token)
             .await?
             .error_for_status()?
             .json()
@@ -83,6 +86,7 @@ impl OutlookProvider {
         Ok(profile)
     }
 
+    /// Fetches summary metadata for a single message using `$select`.
     async fn fetch_one_summary(
         &self,
         access_token: &str,
@@ -93,10 +97,7 @@ impl OutlookProvider {
         );
 
         let message: OutlookMessageResponse = self
-            .http_client
-            .get(&url)
-            .bearer_auth(access_token)
-            .send()
+            .send_request_with_retry(&url, access_token)
             .await?
             .error_for_status()?
             .json()
@@ -128,6 +129,7 @@ impl OutlookProvider {
         })
     }
 
+    /// Downloads the full HTML body and attachments for a single email.
     async fn fetch_full_message_inner(
         &self,
         access_token: &str,
@@ -136,10 +138,7 @@ impl OutlookProvider {
         let url = format!("{GRAPH_BASE}/me/messages/{message_id}?$select=body,uniqueBody");
 
         let message: OutlookMessageResponse = self
-            .http_client
-            .get(&url)
-            .bearer_auth(access_token)
-            .send()
+            .send_request_with_retry(&url, access_token)
             .await?
             .error_for_status()?
             .json()
@@ -192,8 +191,7 @@ impl EmailProvider for OutlookProvider {
         let mut final_delta_link = None;
         let mut page_count = 0;
 
-        // Protocol requirement: Microsoft Graph delta queries do NOT return @odata.deltaLink
-        // on page 1 if more results exist. We must follow @odata.nextLink until the final page.
+        // Exhaust intermediate @odata.nextLink pages until final @odata.deltaLink is obtained
         while let Some(url) = next_url {
             page_count += 1;
             if page_count > MAX_INITIAL_SYNC_PAGES {
@@ -225,7 +223,7 @@ impl EmailProvider for OutlookProvider {
 
         let next_cursor = final_delta_link.ok_or_else(|| {
             ProviderError::InvalidData(
-                "Outlook initial sync ended without returning a delta cursor".to_string(),
+                "Outlook initial sync completed without returning delta cursor".to_string(),
             )
         })?;
 
@@ -244,35 +242,49 @@ impl EmailProvider for OutlookProvider {
         access_token: &str,
         cursor: &SyncCursor,
     ) -> Result<SyncPage, ProviderError> {
-        let raw_response = self
-            .http_client
-            .get(&cursor.0)
-            .bearer_auth(access_token)
-            .send()
-            .await?;
-
-        // Microsoft Graph returns HTTP 410 Gone when the delta token is no longer retained.
-        if raw_response.status() == reqwest::StatusCode::GONE {
-            return Err(ProviderError::CursorExpired);
-        }
-
-        let response: DeltaResponse = raw_response.error_for_status()?.json().await?;
-
+        let mut next_url = Some(cursor.0.clone());
         let mut new_message_ids = Vec::new();
         let mut trashed_message_ids = Vec::new();
+        let mut final_delta_link = None;
+        let mut page_count = 0;
 
-        for item in response.value {
-            if item.removed.is_some() {
-                trashed_message_ids.push(item.id);
-            } else {
-                new_message_ids.push(item.id);
+        // Follow intermediate @odata.nextLink pages to completion to obtain the true @odata.deltaLink
+        while let Some(url) = next_url {
+            page_count += 1;
+            if page_count > MAX_INITIAL_SYNC_PAGES {
+                return Err(ProviderError::InvalidData(format!(
+                    "Outlook incremental sync exceeded maximum page limit of {MAX_INITIAL_SYNC_PAGES}"
+                )));
             }
+
+            let raw_response = self.send_request_with_retry(&url, access_token).await?;
+
+            // HTTP 410 Gone indicates the delta link has expired
+            if raw_response.status() == reqwest::StatusCode::GONE {
+                return Err(ProviderError::CursorExpired);
+            }
+
+            let response: DeltaResponse = raw_response.error_for_status()?.json().await?;
+
+            for item in response.value {
+                if item.removed.is_some() {
+                    trashed_message_ids.push(item.id);
+                } else {
+                    new_message_ids.push(item.id);
+                }
+            }
+
+            if let Some(delta) = response.delta_link {
+                final_delta_link = Some(delta);
+                break;
+            }
+
+            next_url = response.next_link;
         }
 
-        let next_cursor = response.delta_link.or(response.next_link).ok_or_else(|| {
+        let next_cursor = final_delta_link.ok_or_else(|| {
             ProviderError::InvalidData(
-                "Outlook incremental sync response contained neither a nextLink nor a deltaLink"
-                    .to_string(),
+                "Outlook incremental sync completed without returning delta cursor".to_string(),
             )
         })?;
 

@@ -1,3 +1,15 @@
+/* ==========================================================================
+   Fumiko - Add Account Stylesheet
+   ========================================================================== */
+
+/* 1. Customization Tokens */
+:root {
+    --add-account-card-min-height: 130px;
+    --add-account-card-gap: 16px;
+    --add-account-section-padding: 20px;
+    --add-account-input-padding: 10px 14px;
+}
+
 .add-account {
     width: min(100%, var(--page-max-width));
     margin: 0 auto;
@@ -5,13 +17,14 @@
     box-sizing: border-box;
 }
 
+/* 2. Header */
 .add-account__header {
     margin-bottom: 24px;
 }
 
 .add-account__title {
     margin: 0;
-    font-size: 28px;
+    font-size: 26px;
     font-weight: 750;
     letter-spacing: -0.02em;
     background: var(--gradient-title);
@@ -23,21 +36,87 @@
 .add-account__subtitle {
     margin: 6px 0 0;
     color: var(--text-secondary);
-    font-size: 14px;
+    font-size: 13.5px;
+    line-height: 1.5;
 }
 
-/* ==========================================================================
-   Provider Selection Grid
-   ========================================================================== */
+/* 3. Pre-Link Notice Banner */
+.add-account__pre-link-notice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding: 16px 20px;
+    border-radius: var(--radius-md);
+    background: var(--accent-primary-subtle);
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.add-account__pre-link-content {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.add-account__pre-link-title {
+    margin: 0;
+    font-size: 13.5px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+}
+
+.add-account__pre-link-list {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.add-account__pre-link-list strong {
+    color: var(--text-primary);
+}
+
+.add-account__pre-link-alert {
+    color: var(--accent-secondary-bright);
+    font-weight: 600;
+}
+
+.add-account__pre-link-action {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface-raised);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 650;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: all var(--transition-fast);
+}
+
+.add-account__pre-link-action:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-bright);
+    color: var(--accent-primary-bright);
+    transform: translateY(-1px);
+}
+
+/* 4. Provider Selection Grid */
 .add-account__provider-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px;
+    gap: var(--add-account-card-gap);
     margin-top: 16px;
 }
 
 .add-account__provider-card {
-    min-height: 130px;
+    min-height: var(--add-account-card-min-height);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -47,31 +126,40 @@
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     background: var(--bg-surface);
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(14px);
     color: var(--text-primary);
     font: inherit;
     cursor: pointer;
     transition: all var(--transition-fast);
     user-select: none;
     box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
 }
 
 .add-account__provider-card:hover:not(:disabled) {
     border-color: var(--border-bright);
-    background: linear-gradient(145deg, var(--accent-primary-hover), var(--accent-secondary-subtle));
+    background: linear-gradient(135deg, var(--accent-primary-hover), var(--accent-secondary-subtle));
     transform: translateY(-2px);
-    box-shadow: 0 10px 24px var(--accent-primary-glow);
+    box-shadow: 0 8px 24px var(--accent-primary-glow);
 }
 
-.add-account__provider-card--selected {
-    border-color: var(--accent-secondary-bright) !important;
-    background: linear-gradient(145deg, var(--accent-primary-hover), var(--accent-secondary-hover)) !important;
-    box-shadow: 0 0 18px var(--accent-secondary-glow);
+.add-account__provider-card.add-account__provider-card--selected {
+    border-color: var(--border-accent);
+    background: linear-gradient(135deg, var(--accent-primary-subtle), var(--accent-secondary-hover));
+    box-shadow: 0 0 20px var(--accent-secondary-glow);
+    transform: translateY(-2px);
+}
+
+.add-account__provider-card.add-account__provider-card--selected:hover:not(:disabled) {
+    background: linear-gradient(135deg, var(--accent-primary-hover), var(--accent-secondary-hover));
+    box-shadow: 0 0 26px var(--accent-secondary-glow);
 }
 
 .add-account__provider-card--disabled {
     opacity: 0.45;
     cursor: not-allowed;
+    transform: none;
 }
 
 .add-account__google-logo,
@@ -82,8 +170,8 @@
     width: 42px;
     height: 42px;
     border-radius: 50%;
-    background: #ffffff; /* Logos require white disc background for proper brand contrast */
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    background: #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 
 .add-account__microsoft-logo {
@@ -105,9 +193,280 @@
     text-transform: uppercase;
 }
 
-/* ==========================================================================
-   Status & Privacy Callouts
-   ========================================================================== */
+.add-account__provider-badge--highlight {
+    background: var(--accent-primary-subtle);
+    color: var(--accent-primary-bright);
+    border: 1px solid var(--border-subtle);
+}
+
+/* 5. Provider Recommendation & Warning Notice Boxes */
+.add-account__notice-box {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-top: 20px;
+    padding: 16px 18px;
+    border: 1px solid var(--border-accent);
+    border-radius: var(--radius-md);
+    background: var(--accent-secondary-subtle);
+    box-sizing: border-box;
+}
+
+.add-account__notice-icon.icon {
+    width: 22px;
+    height: 22px;
+    background-color: var(--accent-secondary-bright);
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.add-account__notice-content {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.add-account__notice-content strong {
+    color: var(--text-primary);
+    font-size: 13.5px;
+}
+
+.add-account__notice-content p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+
+.add-account__notice-action {
+    align-self: flex-start;
+    margin-top: 8px;
+    padding: 6px 13px;
+    border: 1px solid var(--border-accent);
+    border-radius: var(--radius-sm);
+    background: var(--accent-secondary);
+    color: var(--text-on-accent);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.add-account__notice-action:hover {
+    box-shadow: 0 4px 14px var(--accent-secondary-glow);
+    transform: translateY(-1px);
+}
+
+/* 6. Modern IMAP Section */
+.add-account__imap-section {
+    margin-top: 24px;
+    padding: 24px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    backdrop-filter: blur(14px);
+    box-shadow: var(--panel-shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.add-account__imap-header {
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 16px;
+}
+
+.add-account__section-title {
+    margin: 0 0 6px;
+    color: var(--text-primary);
+    font-size: 16px;
+    font-weight: 750;
+    letter-spacing: -0.01em;
+}
+
+/* Preset Segmented Track */
+.add-account__preset-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.add-account__preset-track {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.add-account__preset-pill {
+    flex: 1 1 auto;
+    padding: 8px 14px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: calc(var(--radius-sm) - 2px);
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 650;
+    cursor: pointer;
+    text-align: center;
+    user-select: none;
+    transition: all var(--transition-fast);
+}
+
+.add-account__preset-pill:hover:not(.add-account__preset-pill--active) {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+.add-account__preset-pill--active {
+    background: var(--gradient-primary);
+    border-color: var(--accent-primary-bright);
+    color: var(--text-on-accent);
+    box-shadow: 0 2px 10px var(--accent-primary-glow);
+    transform: translateY(-0.5px);
+}
+
+/* Setup Guide Card */
+.add-account__guide-card {
+    padding: 14px 16px;
+    border: 1px solid var(--border-subtle);
+    border-left: 3px solid var(--accent-primary-bright);
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface-card);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.add-account__guide-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: var(--radius-pill);
+    background: var(--accent-primary-subtle);
+    color: var(--accent-primary-bright);
+    font-size: 10px;
+    font-weight: 750;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.add-account__guide-body p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    line-height: 1.55;
+}
+
+.add-account__guide-link {
+    color: var(--accent-primary-bright);
+    font-weight: 600;
+    text-decoration: underline;
+    transition: color var(--transition-fast);
+}
+
+.add-account__guide-link:hover {
+    color: var(--text-primary);
+}
+
+/* Form Fields & Grid */
+.add-account__fields-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.add-account__field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.add-account__input-label {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 650;
+    user-select: none;
+}
+
+.add-account__input {
+    width: 100%;
+    padding: var(--add-account-input-padding);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface-card);
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 13px;
+    box-sizing: border-box;
+    transition: all var(--transition-fast);
+}
+
+.add-account__input:focus {
+    outline: none;
+    border-color: var(--border-bright);
+    box-shadow: 0 0 12px var(--accent-primary-glow);
+}
+
+.add-account__input::placeholder {
+    color: var(--text-muted);
+}
+
+/* Server Connection Parameters Sub-Card */
+.add-account__server-section {
+    padding: 16px 18px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface-card);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.add-account__server-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 10px;
+}
+
+.add-account__server-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.add-account__server-sub {
+    font-size: 11.5px;
+    color: var(--accent-success);
+    font-weight: 600;
+}
+
+.add-account__server-grid {
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+    gap: 14px;
+}
+
+.add-account__error-box {
+    padding: 10px 14px;
+    border: 1px solid var(--accent-danger);
+    border-radius: var(--radius-sm);
+    background: var(--accent-danger-subtle);
+    color: var(--accent-danger);
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+/* 7. Status & Privacy Information Callouts */
 .add-account__status-section {
     display: flex;
     flex-direction: column;
@@ -124,22 +483,26 @@
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     background: var(--bg-surface);
+    backdrop-filter: blur(14px);
     box-sizing: border-box;
 }
 
 .add-account__status-box {
-    border-color: var(--accent-primary);
+    border-color: var(--border-bright);
     background: var(--accent-primary-subtle);
 }
 
-.add-account__status-icon {
-    font-size: 20px;
+.add-account__status-icon.icon {
+    width: 18px;
+    height: 18px;
+    background-color: var(--accent-primary-bright);
+    flex-shrink: 0;
 }
 
 .add-account__status-text {
     color: var(--text-primary);
     font-size: 13px;
-    font-weight: 550;
+    font-weight: 650;
     line-height: 1.4;
 }
 
@@ -157,9 +520,7 @@
     line-height: 1.5;
 }
 
-/* ==========================================================================
-   Connect & Cancel Buttons
-   ========================================================================== */
+/* 8. Connect & Cancel Actions */
 .add-account__connect-button {
     width: 100%;
     margin-top: 20px;
@@ -169,10 +530,10 @@
     background: var(--gradient-primary);
     color: var(--text-on-accent);
     font: inherit;
-    font-size: 14.5px;
+    font-size: 14px;
     font-weight: 700;
     cursor: pointer;
-    box-shadow: 0 6px 20px var(--accent-primary-glow);
+    box-shadow: 0 4px 16px var(--accent-primary-glow);
     transition: all var(--transition-fast);
     user-select: none;
     box-sizing: border-box;
@@ -180,7 +541,7 @@
 
 .add-account__connect-button:hover:not(:disabled) {
     background: var(--gradient-accent);
-    box-shadow: 0 8px 28px var(--accent-secondary-glow);
+    box-shadow: 0 6px 22px var(--accent-primary-glow);
     transform: translateY(-1px);
 }
 
@@ -208,7 +569,7 @@
     background: var(--accent-secondary-subtle);
     color: var(--accent-secondary-bright);
     font: inherit;
-    font-size: 13.5px;
+    font-size: 13px;
     font-weight: 650;
     cursor: pointer;
     transition: all var(--transition-fast);
@@ -222,9 +583,7 @@
     box-shadow: 0 4px 16px var(--accent-secondary-glow);
 }
 
-/* ==========================================================================
-   Custom OAuth Credentials Section
-   ========================================================================== */
+/* 9. Developer / Custom OAuth Keys Accordion */
 .add-account__credentials-section {
     margin-top: 32px;
     border: 1px solid var(--border-subtle);
@@ -238,30 +597,59 @@
 .add-account__section-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 10px;
-    padding: 16px 22px;
+    padding: 14px 20px;
     border-bottom: 1px solid var(--border-subtle);
     background: var(--bg-surface-raised);
     user-select: none;
 }
 
-.add-account__section-icon {
-    font-size: 16px;
+.add-account__section-header--clickable {
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.add-account__section-header--clickable:hover {
+    background: var(--bg-hover);
+}
+
+.add-account__section-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.add-account__section-badge {
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--bg-surface-translucent);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.add-account__accordion-arrow {
+    color: var(--text-muted);
+    font-size: 11px;
 }
 
 .add-account__section-header h2 {
     margin: 0;
     color: var(--text-primary);
-    font-size: 15px;
+    font-size: 14.5px;
     font-weight: 700;
 }
 
 .add-account__section-content {
-    padding: 22px;
+    padding: var(--add-account-section-padding);
 }
 
 .add-account__description {
-    margin: 0 0 18px;
+    margin: 0 0 16px;
     color: var(--text-secondary);
     font-size: 13px;
     line-height: 1.5;
@@ -269,7 +657,7 @@
 
 .add-account__credential-provider {
     margin-top: 16px;
-    padding: 18px 20px;
+    padding: 16px 18px;
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     background: var(--bg-surface-raised);
@@ -277,7 +665,7 @@
 }
 
 .add-account__credential-provider h3 {
-    margin: 0 0 12px;
+    margin: 0 0 10px;
     color: var(--text-primary);
     font-size: 14px;
     font-weight: 700;
@@ -287,104 +675,66 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
     color: var(--text-secondary);
-    font-size: 12.5px;
+    font-size: 12px;
     user-select: none;
 }
 
 .add-account__status-dot {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
 }
 
 .add-account__status-dot--connected {
     background: var(--accent-primary-bright);
-    box-shadow: 0 0 8px var(--accent-primary-bright);
+    box-shadow: 0 0 6px var(--accent-primary-bright);
 }
 
 .add-account__status-dot--custom {
     background: var(--accent-secondary-bright);
-    box-shadow: 0 0 8px var(--accent-secondary-bright);
-}
-
-.add-account__input-label {
-    display: block;
-    margin: 12px 0 6px;
-    color: var(--text-secondary);
-    font-size: 12px;
-    font-weight: 650;
-    user-select: none;
-}
-
-.add-account__input {
-    width: 100%;
-    padding: 10px 14px;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    background: var(--bg-surface-card);
-    color: var(--text-primary);
-    font: inherit;
-    font-size: 13px;
-    box-sizing: border-box;
-    transition: all var(--transition-fast);
-}
-
-.add-account__input:focus {
-    outline: none;
-    border-color: var(--accent-primary-bright);
-    box-shadow: 0 0 12px var(--accent-primary-glow);
-}
-
-.add-account__input::placeholder {
-    color: var(--text-muted);
+    box-shadow: 0 0 6px var(--accent-secondary-bright);
 }
 
 .add-account__credential-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    margin-top: 20px;
+    margin-top: 16px;
 }
 
 .add-account__button {
-    padding: 8px 16px;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    background: var(--bg-surface-translucent);
-    color: var(--text-primary);
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 14px;
+    border-radius: var(--radius-sm);
     font: inherit;
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 650;
     cursor: pointer;
     transition: all var(--transition-fast);
     user-select: none;
 }
 
-.add-account__button:hover {
-    border-color: var(--accent-primary-bright);
-    background: var(--bg-hover);
-    color: var(--text-on-accent);
-}
-
 .add-account__button--save,
 .add-account__button--import {
-    border-color: var(--accent-primary);
-    background: var(--gradient-primary);
-    color: var(--text-on-accent);
-    box-shadow: 0 2px 10px var(--accent-primary-glow);
+    border: 1px solid var(--border-subtle);
+    background: var(--accent-primary-subtle);
+    color: var(--accent-primary-bright);
 }
 
 .add-account__button--save:hover,
 .add-account__button--import:hover {
-    background: var(--gradient-accent);
-    box-shadow: 0 4px 14px var(--accent-primary-glow);
+    border-color: var(--border-bright);
+    background: var(--accent-primary-hover);
+    color: var(--text-primary);
+    box-shadow: 0 0 12px var(--accent-primary-glow);
 }
 
 .add-account__button--remove {
+    border: 1px solid var(--border-accent);
     background: var(--accent-secondary-subtle);
-    border-color: var(--border-accent);
     color: var(--accent-secondary-bright);
 }
 
@@ -393,11 +743,16 @@
     color: var(--text-on-accent);
 }
 
-/* ==========================================================================
-   Responsive Breakpoints
-   ========================================================================== */
+/* 10. Consolidated Responsive Breakpoints */
 @media (max-width: 700px) {
     .add-account__provider-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .add-account__fields-group,
+    .add-account__server-grid {
         grid-template-columns: 1fr;
     }
 }

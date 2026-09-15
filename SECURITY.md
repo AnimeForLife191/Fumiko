@@ -10,7 +10,7 @@ Security patches and bug fixes are applied to the latest release.
 
 | Version | Supported |
 | :--- | :--- |
-| Latest release (`v0.1.x` / `main`) | Yes |
+| Latest release (`v0.2.x` / `main`) | Yes |
 | Older releases | No |
 
 ---

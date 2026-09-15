@@ -1,7 +1,12 @@
+//! Key-value configuration storage for application options.
+
 use super::{Storage, StorageError};
 
 impl Storage {
     /// Inserts or updates an application setting key-value pair.
+    ///
+    /// # Errors
+    /// Returns [`StorageError::Db`] if the upsert query fails.
     pub async fn set_setting(&self, key: &str, value: &str) -> Result<(), StorageError> {
         sqlx::query(
             "INSERT INTO settings (key, value) VALUES (?, ?)
@@ -14,7 +19,10 @@ impl Storage {
         Ok(())
     }
 
-    /// Retrieves an application setting value by key.
+    /// Retrieves an application setting value by its configuration key.
+    ///
+    /// # Errors
+    /// Returns [`StorageError::Db`] if the query fails.
     pub async fn get_setting(&self, key: &str) -> Result<Option<String>, StorageError> {
         let row: Option<(String,)> = sqlx::query_as("SELECT value FROM settings WHERE key = ?")
             .bind(key)
@@ -24,6 +32,11 @@ impl Storage {
     }
 
     /// Deletes an application setting key-value pair.
+    ///
+    /// Safe no-op if the key does not exist.
+    ///
+    /// # Errors
+    /// Returns [`StorageError::Db`] if the deletion query fails.
     pub async fn delete_setting(&self, key: &str) -> Result<(), StorageError> {
         sqlx::query("DELETE FROM settings WHERE key = ?")
             .bind(key)

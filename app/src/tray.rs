@@ -1,3 +1,8 @@
+//! Operating system system tray icon and background menu integration.
+
+use std::process::Child;
+use std::sync::{Arc, Mutex};
+
 use dioxus::desktop::{
     DesktopContext,
     muda::{Menu, MenuItem},
@@ -9,7 +14,12 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::state::SyncTarget;
 
-pub fn use_system_tray(window: DesktopContext, sync_tx: UnboundedSender<SyncTarget>) {
+/// Initializes the host operating system system tray icon and event handlers.
+pub fn use_system_tray(
+    window: DesktopContext,
+    sync_tx: UnboundedSender<SyncTarget>,
+    active_child_process: Arc<Mutex<Option<Child>>>,
+) {
     let (_tray, open_id, sync_id, quit_id) = use_hook(|| {
         let tray_menu = Menu::new();
         let open_item = MenuItem::new("Open Fumiko", true, None);
@@ -23,27 +33,42 @@ pub fn use_system_tray(window: DesktopContext, sync_tx: UnboundedSender<SyncTarg
             let image = image::load_from_memory(bytes)
                 .expect("Failed to load icon memory")
                 .into_rgba8();
-            
+
             let (width, height) = image.dimensions();
             let rgba_bytes = image.into_raw();
 
-            Icon::from_rgba(rgba_bytes, width, height)
-                .expect("Failed to create tray icon")
+            Icon::from_rgba(rgba_bytes, width, height).expect("Failed to create tray icon")
         };
 
         let tray = init_tray_icon(tray_menu, Some(icon));
 
-        (tray, open_item.id().clone(), sync_item.id().clone(), quit_item.id().clone())
+        (
+            tray,
+            open_item.id().clone(),
+            sync_item.id().clone(),
+            quit_item.id().clone(),
+        )
     });
 
     use_muda_event_handler(move |event| {
         if event.id == open_id {
+            // Restore window visibility and bring to focus
             window.set_visible(true);
             window.set_minimized(false);
             window.set_focus();
         } else if event.id == sync_id {
             let _ = sync_tx.send(SyncTarget::All);
         } else if event.id == quit_id {
+            // Explicit Child Termination:
+            // std::process::exit(0) terminates the host process immediately without unwinding
+            // the stack or running Rust Drop handlers. Terminate the child process manually
+            // to ensure llama-server is not left running as a zombie process in RAM.
+            if let Ok(mut lock) = active_child_process.lock() {
+                if let Some(mut child) = lock.take() {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                }
+            }
             std::process::exit(0);
         }
     });

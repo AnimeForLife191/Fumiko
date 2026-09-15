@@ -5,6 +5,7 @@ use std::{fmt, str::FromStr};
 pub enum Provider {
     Gmail,
     Outlook,
+    Imap,
 }
 
 impl Provider {
@@ -12,6 +13,7 @@ impl Provider {
         match self {
             Provider::Gmail => "gmail",
             Provider::Outlook => "outlook",
+            Provider::Imap => "imap",
         }
     }
 }
@@ -29,6 +31,7 @@ impl FromStr for Provider {
         match value {
             "gmail" => Ok(Self::Gmail),
             "outlook" => Ok(Self::Outlook),
+            "imap" => Ok(Self::Imap),
             other => Err(format!("unsupported provider: {other}")),
         }
     }

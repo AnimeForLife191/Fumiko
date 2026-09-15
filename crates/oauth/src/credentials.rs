@@ -1,3 +1,5 @@
+//! OAuth credential parsing, validation, and resolution.
+
 use serde_json::{Value, from_str};
 
 use common::CredentialError;
@@ -5,38 +7,47 @@ use storage::Storage;
 
 use super::models::{OAuthProvider, RawCredentials};
 
-/// Extracts the `client_id` and `client_secret` from a downloaded Google `credentials.json` file.
+/// Extracts `client_id` and `client_secret` from a Google credentials JSON file.
 ///
-/// Expects the standard Google Cloud Console desktop client format with an `"installed"` JSON root.
+/// Strictly expects Google Cloud Console "Desktop app" credentials containing
+/// the `"installed"` root object. Web client credentials are not supported because
+/// Google restricts dynamic loopback ports on web client types.
 ///
 /// # Errors
-/// Returns [`CredentialError::MissingGoogleClientId`] or [`CredentialError::MissingGoogleClientSecret`]
-/// if either key is missing from the `"installed"` object.
+/// Returns [`CredentialError::InvalidJson`] if the input string is not valid JSON,
+/// [`CredentialError::MissingGoogleClientId`] if the `"installed"` object or `"client_id"` field is absent,
+/// or [`CredentialError::MissingGoogleClientSecret`] if `"client_secret"` is absent.
 pub fn parse_google_credentials_json(contents: &str) -> Result<(String, String), CredentialError> {
     let raw_json: Value = from_str(contents)?;
-    let installed = &raw_json["installed"];
+
+    let installed = raw_json
+        .get("installed")
+        .ok_or(CredentialError::MissingGoogleClientId)?;
 
     let client_id = installed["client_id"]
         .as_str()
         .ok_or(CredentialError::MissingGoogleClientId)?
+        .trim()
         .to_string();
 
     let client_secret = installed["client_secret"]
         .as_str()
         .ok_or(CredentialError::MissingGoogleClientSecret)?
+        .trim()
         .to_string();
 
     Ok((client_id, client_secret))
 }
 
-/// Resolves OAuth credentials for the specified provider.
+/// Resolves OAuth endpoints and credentials for the specified provider.
 ///
-/// Prioritizes user-configured credentials saved in SQLite settings and Keyring, falling back
-/// to compile-time bundled credentials if no user overrides exist.
+/// Prioritizes user-configured developer credentials stored in SQLite settings and Keyring,
+/// falling back to bundled application credentials if no custom overrides exist.
 ///
 /// # Errors
-/// Returns [`CredentialError::MissingClientId`] or [`CredentialError::MissingGoogleClientSecret`]
-/// if neither user-supplied nor bundled credentials are available.
+/// Returns [`CredentialError::MissingClientId`] if no client ID is available for the provider,
+/// [`CredentialError::MissingGoogleClientSecretConfig`] if Google credentials lack a client secret,
+/// or [`CredentialError::Storage`] if querying local storage or the keyring fails.
 pub async fn load_credentials(
     provider: &OAuthProvider,
     storage: &Storage,
@@ -54,7 +65,7 @@ pub async fn load_credentials(
                         .ok_or(CredentialError::MissingClientId { provider: "Google" })?
                         .to_string(),
                     bundled_client_secret
-                        .ok_or(CredentialError::MissingGoogleClientSecret)?
+                        .ok_or(CredentialError::MissingGoogleClientSecretConfig)?
                         .to_string(),
                 ),
             };
@@ -78,6 +89,9 @@ pub async fn load_credentials(
                     .to_string(),
             };
 
+            // Using the multi-tenant "common" endpoint allows both personal Microsoft
+            // accounts (@outlook.com, @hotmail.com) and organizational Microsoft Entra tenants
+            // to authenticate against the same registered client.
             let tenant_id = "common";
 
             Ok(RawCredentials {

@@ -1,3 +1,5 @@
+//! Process management and model registry interactions for the external Ollama daemon.
+
 use common::BoxError;
 use futures_util::StreamExt;
 use reqwest::Client as ReqwestClient;
@@ -6,20 +8,18 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 use tokio::time::sleep;
 
-use crate::ollama::models_list::names_match;
-
-use super::OLLAMA_BASE_URL;
-use super::models_list::{OllamaModel, list_available_models};
+use super::DEFAULT_OLLAMA_URL;
+use super::models::{list_available_models, names_match};
 
 const HEALTH_POLL_ATTEMPTS: u32 = 10;
 const HEALTH_POLL_INTERVAL: Duration = Duration::from_millis(500);
 
-/// Outcome returned when ensuring the Ollama background daemon is active.
+/// Outcome returned when attempting to launch `ollama serve`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ServeOutcome {
-    /// The daemon was already listening on `127.0.0.1:11434`.
+    /// The Ollama daemon was already running and listening on the network port.
     AlreadyRunning,
-    /// The daemon was spawned as a background process and passed readiness polling.
+    /// The process was spawned and successfully passed readiness polling.
     StartedNow,
 }
 
@@ -34,7 +34,7 @@ struct DeleteRequest<'a> {
     model: &'a str,
 }
 
-/// Progress update chunk received while streaming a model download.
+/// Progress event emitted during streaming model pulls from Ollama's registry.
 #[derive(Debug, Deserialize, Clone, Serialize, PartialEq)]
 pub struct PullProgress {
     #[serde(default)]
@@ -45,13 +45,12 @@ pub struct PullProgress {
     pub total: Option<u64>,
     #[serde(default)]
     pub completed: Option<u64>,
-    /// Server error reported inline within the streaming NDJSON payload.
     #[serde(default)]
     pub error: Option<String>,
 }
 
 impl PullProgress {
-    /// Returns the current download progress as a fractional value between `0.0` and `1.0`.
+    /// Returns the progress fraction completed between `0.0` and `1.0`.
     pub fn fraction(&self) -> Option<f32> {
         match (self.completed, self.total) {
             (Some(completed), Some(total)) if total > 0 => Some(completed as f32 / total as f32),
@@ -59,27 +58,36 @@ impl PullProgress {
         }
     }
 
-    /// Checks if this progress chunk indicates download completion.
+    /// Returns `true` if this progress frame indicates successful completion.
     pub fn is_success(&self) -> bool {
         self.status.as_deref() == Some("success")
     }
 }
 
-/// Manages the operational lifecycle of the local Ollama background daemon and model downloads.
+/// Service controller for communicating with an Ollama daemon.
 pub struct OllamaService {
     http_client: ReqwestClient,
+    base_url: String,
 }
 
 impl OllamaService {
-    /// Creates a new `OllamaService` instance.
+    /// Creates an `OllamaService` targeting the default loopback endpoint (`127.0.0.1:11434`).
     pub fn new(http_client: ReqwestClient) -> Self {
-        Self { http_client }
+        Self::with_base_url(http_client, DEFAULT_OLLAMA_URL)
     }
 
-    /// Checks if the Ollama daemon is currently responsive on `127.0.0.1:11434`.
+    /// Creates an `OllamaService` targeting a custom daemon URL.
+    pub fn with_base_url(http_client: ReqwestClient, base_url: impl Into<String>) -> Self {
+        Self {
+            http_client,
+            base_url: base_url.into().trim_end_matches('/').to_string(),
+        }
+    }
+
+    /// Checks whether the Ollama daemon is actively responding on loopback.
     pub async fn is_running(&self) -> bool {
         self.http_client
-            .get(format!("{OLLAMA_BASE_URL}/api/tags"))
+            .get(format!("{}/api/tags", self.base_url))
             .timeout(Duration::from_secs(2))
             .send()
             .await
@@ -87,7 +95,15 @@ impl OllamaService {
             .unwrap_or(false)
     }
 
-    /// Spawns `ollama serve` as a background process if inactive and polls for readiness.
+    /// Spawns `ollama serve` in the background if not already running.
+    ///
+    /// Configures environment variables to limit concurrency to single-slot execution:
+    /// - `OLLAMA_NUM_PARALLEL=1`: Prevents allocating multiple KV cache buffers simultaneously.
+    /// - `OLLAMA_MAX_LOADED_MODELS=1`: Prevents pinning multiple heavy model weights in system RAM.
+    ///
+    /// # Errors
+    /// Returns a [`BoxError`] if spawning the binary fails or if the daemon fails to respond
+    /// within 5 seconds.
     pub async fn serve(&self) -> Result<ServeOutcome, BoxError> {
         if self.is_running().await {
             return Ok(ServeOutcome::AlreadyRunning);
@@ -95,13 +111,13 @@ impl OllamaService {
 
         let mut cmd = Command::new("ollama");
         cmd.arg("serve")
-            // Prevent Ollama from allocating multiple concurrent model slots
             .env("OLLAMA_NUM_PARALLEL", "1")
             .env("OLLAMA_MAX_LOADED_MODELS", "1")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .stdin(Stdio::null());
 
+        // On Windows, suppress flashing console windows
         #[cfg(target_os = "windows")]
         {
             use std::os::windows::process::CommandExt;
@@ -120,16 +136,26 @@ impl OllamaService {
             sleep(HEALTH_POLL_INTERVAL).await;
         }
 
-        Err("`ollama serve` was started but never came up on 127.0.0.1:11434".into())
+        Err(format!(
+            "`ollama serve` was started but never responded on {}",
+            self.base_url
+        )
+        .into())
     }
 
-    /// Checks if a model tag is already pulled and available locally.
+    /// Checks whether a model tag has already been pulled and is available locally.
+    ///
+    /// # Errors
+    /// Returns a [`BoxError`] if listing installed models fails.
     pub async fn is_model_pulled(&self, model: &str) -> Result<bool, BoxError> {
-        let models: Vec<OllamaModel> = list_available_models(&self.http_client).await?;
+        let models = list_available_models(&self.http_client).await?;
         Ok(models.iter().any(|m| names_match(&m.name, model)))
     }
 
-    /// Streams a model pull from the Ollama registry, notifying the progress callback on updates.
+    /// Streams a model pull from the Ollama registry, emitting progress events to the callback.
+    ///
+    /// # Errors
+    /// Returns a [`BoxError`] if the download is interrupted, fails HTTP validation, or reports an error payload.
     pub async fn pull_model(
         &self,
         model: &str,
@@ -137,7 +163,7 @@ impl OllamaService {
     ) -> Result<(), BoxError> {
         let response = self
             .http_client
-            .post(format!("{OLLAMA_BASE_URL}/api/pull"))
+            .post(format!("{}/api/pull", self.base_url))
             .json(&PullRequest {
                 name: model,
                 stream: true,
@@ -154,7 +180,6 @@ impl OllamaService {
             let chunk = chunk?;
             buffer.push_str(&String::from_utf8_lossy(&chunk));
 
-            // Buffer incomplete chunks across line boundaries.
             while let Some(newline_idx) = buffer.find('\n') {
                 let line = buffer[..newline_idx].trim().to_string();
                 buffer.drain(..=newline_idx);
@@ -183,10 +208,13 @@ impl OllamaService {
         }
     }
 
-    /// Deletes a model from local storage (`DELETE /api/delete`).
+    /// Deletes a model from the local Ollama registry via `DELETE /api/delete`.
+    ///
+    /// # Errors
+    /// Returns a [`BoxError`] if the deletion request fails.
     pub async fn delete_model(&self, model: &str) -> Result<(), BoxError> {
         self.http_client
-            .delete(format!("{OLLAMA_BASE_URL}/api/delete"))
+            .delete(format!("{}/api/delete", self.base_url))
             .json(&DeleteRequest { model })
             .send()
             .await?
@@ -194,7 +222,10 @@ impl OllamaService {
         Ok(())
     }
 
-    /// Ensures the Ollama server is running and downloads the model if not already present.
+    /// Ensures that the daemon is active and the specified model is installed, pulling if absent.
+    ///
+    /// # Errors
+    /// Returns a [`BoxError`] if starting the daemon or pulling the model fails.
     pub async fn ensure_ready(
         &self,
         model: &str,

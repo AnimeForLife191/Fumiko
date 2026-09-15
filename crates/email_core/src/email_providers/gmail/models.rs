@@ -1,24 +1,25 @@
+//! Serde deserialization models for Google Gmail API responses.
+
 use serde::Deserialize;
 
+/// Mailbox profile response containing the baseline historyId.
 #[derive(Debug, Clone, Deserialize)]
 pub struct GmailProfileResponse {
     #[serde(rename = "emailAddress")]
     pub email_address: String,
-    // history_id is a numeric string representing the current state of the mailbox.
-    // It serves as the baseline cursor for incremental sync.
     #[serde(rename = "historyId")]
     pub history_id: String,
 }
 
+/// Lightweight reference containing only a Gmail message ID.
 #[derive(Debug, Clone, Deserialize)]
 pub struct MessageRefId {
     pub id: String,
 }
 
+/// Paginated message listing response from `GET /users/me/messages`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ListMessagesResponse {
-    // Note: Gmail omits the `messages` key entirely when a search or label query
-    // matches 0 items, rather than returning an empty array `[]`.
     pub messages: Option<Vec<MessageRefId>>,
     #[serde(rename = "nextPageToken")]
     pub next_page_token: Option<String>,
@@ -37,8 +38,6 @@ pub struct MessageDeleted {
 #[derive(Debug, Clone, Deserialize)]
 pub struct LabelAdded {
     pub message: MessageRefId,
-    // label_ids contains ONLY the newly applied labels in this history event,
-    // not the complete set of labels currently attached to the message.
     #[serde(rename = "labelIds")]
     pub label_ids: Vec<String>,
 }
@@ -50,6 +49,7 @@ pub struct LabelRemoved {
     pub label_ids: Vec<String>,
 }
 
+/// Single change event emitted by `GET /users/me/history`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct HistoryRecord {
     #[serde(rename = "messagesAdded")]
@@ -62,10 +62,10 @@ pub struct HistoryRecord {
     pub labels_removed: Option<Vec<LabelRemoved>>,
 }
 
+/// Paginated history change log response.
 #[derive(Debug, Clone, Deserialize)]
 pub struct HistoryListResponse {
     pub history: Option<Vec<HistoryRecord>>,
-    // Points to the newest history point reached during this sync window.
     #[serde(rename = "historyId")]
     pub history_id: String,
     #[serde(rename = "nextPageToken")]
@@ -83,10 +83,10 @@ pub struct MessagePayloadHeaders {
     pub headers: Vec<MessageHeader>,
 }
 
+/// Summary representation returned when querying `format=metadata`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct GmailMessageSummaryResponse {
     pub payload: Option<MessagePayloadHeaders>,
-    // Gmail returns internalDate as epoch milliseconds serialized within a JSON string.
     #[serde(rename = "internalDate")]
     pub internal_date: String,
     #[serde(rename = "labelIds")]
@@ -94,18 +94,16 @@ pub struct GmailMessageSummaryResponse {
     pub snippet: Option<String>,
 }
 
+/// Encoded message body or attachment reference within a MIME part.
 #[derive(Debug, Clone, Deserialize)]
 pub struct MessagePartBody {
-    // Inline Base64 URL-safe encoded data (only present if payload is below size limits).
     pub data: Option<String>,
-
-    // Populated if Gmail offloaded the part's body to attachment storage due to size.
     #[serde(rename = "attachmentId")]
     pub attachment_id: Option<String>,
-
     pub size: Option<u64>,
 }
 
+/// Recursive MIME tree structure representing multipart message payloads.
 #[derive(Debug, Clone, Deserialize)]
 pub struct MessagePartFull {
     #[serde(rename = "mimeType")]
@@ -113,15 +111,16 @@ pub struct MessagePartFull {
     pub filename: Option<String>,
     pub headers: Option<Vec<MessageHeader>>,
     pub body: Option<MessagePartBody>,
-    // Recursive MIME tree: multipart messages contain child parts at arbitrary nesting depths.
     pub parts: Option<Vec<MessagePartFull>>,
 }
 
+/// Attachment data response payload returned by `GET /attachments/{id}`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct AttachmentDataResponse {
     pub data: String,
 }
 
+/// Full message representation returned by `format=full`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct GmailFullMessageResponse {
     pub payload: Option<MessagePartFull>,

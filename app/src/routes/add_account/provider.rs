@@ -1,13 +1,18 @@
+//! Provider visual assets, display labels, and SVG brand marks.
+
 use common::Provider;
 use dioxus::prelude::*;
 
+/// Returns the user-facing display label for an email provider.
 pub fn provider_name(provider: Provider) -> &'static str {
     match provider {
         Provider::Gmail => "Gmail",
         Provider::Outlook => "Outlook",
+        Provider::Imap => "IMAP",
     }
 }
 
+/// Renders the branded vector SVG emblem for a provider.
 pub fn provider_icon(provider: Provider) -> Element {
     match provider {
         Provider::Gmail => rsx! {
@@ -15,6 +20,9 @@ pub fn provider_icon(provider: Provider) -> Element {
         },
         Provider::Outlook => rsx! {
             MicrosoftSignInButton {}
+        },
+        Provider::Imap => rsx! {
+            ImapSignInButton {}
         },
     }
 }
@@ -88,6 +96,37 @@ fn MicrosoftSignInButton() -> Element {
                     width: "10",
                     height: "10",
                     fill: "#FFB900",
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn ImapSignInButton() -> Element {
+    rsx! {
+        span { class: "add-account__imap-logo", aria_label: "IMAP logo",
+            svg {
+                view_box: "0 0 24 24",
+                width: "26",
+                height: "26",
+                display: "block",
+                fill: "none",
+                stroke: "currentColor",
+                stroke_width: "2",
+                stroke_linecap: "round",
+                stroke_linejoin: "round",
+                rect {
+                    x: "2",
+                    y: "4",
+                    width: "20",
+                    height: "16",
+                    rx: "3",
+                    stroke: "var(--accent-primary-bright, #b794ff)",
+                }
+                path {
+                    d: "m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7",
+                    stroke: "var(--accent-secondary-bright, #ffa4ad)",
                 }
             }
         }

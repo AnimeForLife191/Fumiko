@@ -1,5 +1,7 @@
-use dioxus::prelude::*;
+//! Connected account management, inline alias renaming, and unlinking actions.
+
 use crate::{AppState, Route};
+use dioxus::prelude::*;
 use storage::Storage;
 use uuid::Uuid;
 
@@ -72,6 +74,7 @@ pub fn LinkedAccountsSection() -> Element {
     }
 }
 
+/// Editable account name item supporting in-place renaming and reset to email address.
 #[component]
 fn EditableAccountName(
     account_id: Uuid,
@@ -177,7 +180,7 @@ fn EditableAccountName(
                     },
                     title: "Click to rename account",
                     span { class: "settings__account-name-text", "{current_name}" }
-                    span { class: "settings__edit-icon", "✏️" }
+                    span { class: "icon icon--edit settings__edit-icon" }
                 }
 
                 if has_custom_name {

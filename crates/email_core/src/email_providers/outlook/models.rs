@@ -1,20 +1,20 @@
+//! Serde models for Microsoft Graph API responses.
+
 use serde::Deserialize;
 
+/// User profile response from Microsoft Graph `GET /me`.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OutlookProfileResponse {
-    // Microsoft 365 accounts use `mail`, while personal MS / guest accounts
-    // often only populate `userPrincipalName`.
     pub mail: Option<String>,
     pub user_principal_name: Option<String>,
     pub display_name: Option<String>,
 }
 
+/// Sparse message representation returned by `$select` queries.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OutlookMessageResponse {
-    // Graph endpoints return sparse objects containing only the fields specified in `$select`.
-    // All fields are therefore `Option` to allow reusing this struct across different queries.
     pub _id: Option<String>,
     pub subject: Option<String>,
     pub from: Option<OutlookRecipient>,
@@ -38,31 +38,29 @@ pub struct OutlookEmailAddress {
     pub address: String,
 }
 
+/// Message body payload returned by Microsoft Graph.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OutlookBody {
-    // Graph returns contentType as either "text" or "html".
     pub content_type: String,
     pub content: String,
 }
 
+/// Paginated delta query response for change tracking.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeltaResponse {
     pub value: Vec<DeltaMessageItem>,
-    // @odata.nextLink indicates additional result pages remain in this delta pass.
     #[serde(rename = "@odata.nextLink")]
     pub next_link: Option<String>,
-    // @odata.deltaLink is ONLY returned on the final page of a delta query and
-    // serves as the cursor for the subsequent incremental sync.
     #[serde(rename = "@odata.deltaLink")]
     pub delta_link: Option<String>,
 }
 
+/// Individual item inside a delta response.
 #[derive(Debug, Clone, Deserialize)]
 pub struct DeltaMessageItem {
     pub id: String,
-    // Graph marks both hard deletions and items moved out of the folder with `@removed`.
     #[serde(rename = "@removed")]
     pub removed: Option<RemovedReason>,
 }
@@ -77,6 +75,7 @@ pub struct AttachmentListResponse {
     pub value: Vec<OutlookAttachment>,
 }
 
+/// Attachment item returned by `GET /messages/{id}/attachments`.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OutlookAttachment {
@@ -85,8 +84,6 @@ pub struct OutlookAttachment {
     pub content_type: Option<String>,
     pub size: Option<i64>,
     pub is_inline: Option<bool>,
-    // Matches the Content-ID referenced by `<img src="cid:...">` in HTML bodies.
     pub content_id: Option<String>,
-    // Raw Base64 attachment bytes; only populated when explicitly queried with $select on fileAttachment.
     pub content_bytes: Option<String>,
 }

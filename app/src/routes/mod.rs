@@ -1,18 +1,18 @@
-mod layout;
-mod add_account;
-mod dashboard;
-mod findings;
-mod inbox;
-mod settings;
-mod trash;
-mod component;
+//! View routing declarations and subcomponent exports.
 
-pub use {
-    layout::Layout, 
-    add_account::AddAccount, 
-    dashboard::Dashboard, 
-    inbox::{Inbox}, 
-    findings::Findings, 
-    settings::Settings, 
-    trash::Trash
-};
+pub mod add_account;
+pub mod component;
+pub mod dashboard;
+pub mod findings;
+pub mod inbox;
+pub mod layout;
+pub mod settings;
+pub mod trash;
+
+pub use add_account::AddAccount;
+pub use dashboard::Dashboard;
+pub use findings::Findings;
+pub use inbox::Inbox;
+pub use layout::Layout;
+pub use settings::Settings;
+pub use trash::Trash;

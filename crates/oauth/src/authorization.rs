@@ -1,3 +1,5 @@
+//! Loopback authorization server, PKCE exchange, and callback validation.
+
 use oauth2::{
     AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointNotSet, EndpointSet,
     PkceCodeChallenge, RedirectUrl, Scope, TokenUrl,
@@ -19,13 +21,14 @@ use super::models::{OAuthProvider, RawCredentials, TokenSet};
 use super::tokens::response_to_token_set;
 use common::OAuthError;
 
+/// Configured OAuth client specialized for authorization and token exchange.
 pub type OAuthClient =
     BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet>;
 
+/// Loopback HTTP request path expected for authorization code callbacks.
 pub const REDIRECT_PATH: &str = "/";
 
-/// RAII Guard that ensures the blocking loopback listener is immediately
-/// unblocked and terminated if the `run_oauth` future is cancelled or dropped.
+/// RAII Guard that unblocks the loopback listener if the OAuth future is dropped or cancelled.
 struct ListenerGuard {
     cancel: Arc<AtomicBool>,
     port: u16,
@@ -40,18 +43,24 @@ impl Drop for ListenerGuard {
     }
 }
 
+/// Constructs a configured [`OAuthClient`] targeting the specified ephemeral loopback port.
+///
+/// # Errors
+/// Returns [`OAuthError::InvalidEndpointConfig`] if the authorization URL, token URL,
+/// or generated redirect URI cannot be parsed.
 pub(crate) fn build_oauth_client(
     credentials: RawCredentials,
     redirect_port: u16,
 ) -> Result<OAuthClient, OAuthError> {
-    let client_id = ClientId::new(credentials.client_id);
+    let client_id = ClientId::new(credentials.client_id.trim().to_string());
     let auth_url = AuthUrl::new(credentials.auth_uri)
         .map_err(|e| OAuthError::InvalidEndpointConfig(Box::new(e)))?;
     let token_url = TokenUrl::new(credentials.token_uri)
         .map_err(|e| OAuthError::InvalidEndpointConfig(Box::new(e)))?;
 
-    // RFC 8252 §7.3 specifies loopback redirects using numeric 127.0.0.1 to avoid
-    // operating systems resolving 'localhost' to IPv6 ::1 where no listener is bound.
+    // RFC 8252 Section 7.3: Loopback redirection must use numeric 127.0.0.1.
+    // Modern operating systems often resolve "localhost" to IPv6 ::1 first,
+    // which fails with connection refused when the local listener only binds IPv4.
     let redirect_url = format!("http://127.0.0.1:{redirect_port}{REDIRECT_PATH}");
 
     let mut client = BasicClient::new(client_id)
@@ -63,42 +72,44 @@ pub(crate) fn build_oauth_client(
         );
 
     if let Some(secret) = credentials.client_secret {
-        client = client.set_client_secret(ClientSecret::new(secret));
+        client = client.set_client_secret(ClientSecret::new(secret.trim().to_string()));
     }
 
     Ok(client)
 }
 
-/// Executes a complete desktop OAuth 2.0 authorization code flow with PKCE.
+/// Executes a complete desktop OAuth 2.0 PKCE authorization flow.
 ///
-/// Binds a temporary `TcpListener` to an OS-assigned ephemeral port (`127.0.0.1:0`), opens the
-/// system's default browser to the provider's sign-in screen, captures the redirect callback,
-/// validates the CSRF state in constant time, and exchanges the authorization code for tokens.
-///
-/// # Invariants & Security
-/// - The local listener runs strictly on `127.0.0.1` and enforces a 120-second overall timeout.
-/// - Unrelated network traffic (such as favicon requests or port scans) is served a 404 and discarded
-///   without terminating the waiting listener.
+/// Coordinates an ephemeral loopback HTTP server, launches the system default browser
+/// to the identity provider's consent screen, waits for the code redirect, validates
+/// CSRF state in constant time, and exchanges the authorization code for tokens.
 ///
 /// # Errors
-/// Returns [`OAuthError::CallbackTimeout`] if the user does not finish within 120 seconds,
-/// [`OAuthError::AccessDenied`] if the user cancels on the consent screen, or
-/// [`OAuthError::CsrfMismatch`] if the returned state token does not match the request.
+/// Returns [`OAuthError::ListenerBindFailed`] if binding to `127.0.0.1:0` fails,
+/// [`OAuthError::BrowserLaunchFailed`] if the operating system cannot launch the browser,
+/// [`OAuthError::CallbackTimeout`] if the user abandons the browser flow past 120 seconds,
+/// [`OAuthError::CsrfMismatch`] if the echoed state parameter does not match,
+/// [`OAuthError::AccessDenied`] if the user denies consent in the browser,
+/// or [`OAuthError::TokenExchange`] if the HTTPS token exchange request fails.
 pub async fn run_oauth(
     credentials: RawCredentials,
     provider: &OAuthProvider,
     scopes: Vec<Scope>,
 ) -> Result<TokenSet, OAuthError> {
+    // Binding to port 0 instructs the operating system kernel to allocate an available dynamic port.
+    // This avoids port collisions with other applications and allows concurrent logins.
     let listener = TcpListener::bind(("127.0.0.1", 0))
-        .map_err(|e| OAuthError::BrowserLaunchFailed(Box::new(e)))?;
+        .map_err(|e| OAuthError::ListenerBindFailed(Box::new(e)))?;
 
     let redirect_port = listener
         .local_addr()
-        .map_err(|e| OAuthError::BrowserLaunchFailed(Box::new(e)))?
+        .map_err(|e| OAuthError::ListenerBindFailed(Box::new(e)))?
         .port();
 
     let oauth_client = build_oauth_client(credentials, redirect_port)?;
 
+    // PKCE protects the code exchange against interception by malicious local software.
+    // The random SHA-256 challenge is sent in the URL; the verifier stays strictly in memory.
     let (pkce_code_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
     let mut request = oauth_client
         .authorize_url(CsrfToken::new_random)
@@ -116,12 +127,16 @@ pub async fn run_oauth(
 
     let cancel = Arc::new(AtomicBool::new(false));
 
+    // The ListenerGuard triggers an internal loopback ping if this future is cancelled or dropped,
+    // ensuring the blocking accept() loop terminates and releases the port immediately.
     let mut guard = ListenerGuard {
         cancel: cancel.clone(),
         port: redirect_port,
         completed: false,
     };
 
+    // Standard TcpListener::accept is synchronous. Running it on Tokio's blocking thread pool
+    // keeps the async runtime free to render UI and process background sync passes.
     let callback_task = {
         let cancel = cancel.clone();
         tokio::task::spawn_blocking(move || {
@@ -135,6 +150,7 @@ pub async fn run_oauth(
 
     tokio::pin!(callback_task);
 
+    // Give the user up to 2 minutes to complete browser authentication before timing out.
     let callback_result = tokio::time::timeout(Duration::from_secs(120), &mut callback_task).await;
 
     let (code, returned_state) = match callback_result {
@@ -150,8 +166,11 @@ pub async fn run_oauth(
 
     validate_csrf_state(&csrf_token, &returned_state)?;
 
+    // Redirect policy is disabled because OAuth token endpoints return JSON payloads directly.
+    // Following HTTP redirects on token endpoints can leak credentials or mask routing failures.
     let http_client = ClientBuilder::new()
         .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(30))
         .build()
         .map_err(|e| OAuthError::Network(Box::new(e)))?;
 
@@ -167,6 +186,10 @@ pub async fn run_oauth(
     Ok(tokens)
 }
 
+/// Compares two byte slices in constant time using bitwise XOR accumulation.
+///
+/// Running the complete comparison without short-circuiting on mismatch prevents
+/// microarchitectural timing side channels that could allow state token byte discovery.
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;
@@ -177,6 +200,7 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
         == 0
 }
 
+/// Validates that the returned CSRF state token matches the expected request token byte-by-byte.
 fn validate_csrf_state(expected: &CsrfToken, returned: &str) -> Result<(), OAuthError> {
     if !constant_time_eq(expected.secret().as_bytes(), returned.as_bytes()) {
         return Err(OAuthError::CsrfMismatch);
@@ -184,6 +208,7 @@ fn validate_csrf_state(expected: &CsrfToken, returned: &str) -> Result<(), OAuth
     Ok(())
 }
 
+/// Listens on the bound TCP socket until a valid OAuth redirect callback is handled or cancelled.
 fn receive_authorization_code(
     listener: TcpListener,
     port: u16,
@@ -194,7 +219,7 @@ fn receive_authorization_code(
             .accept()
             .map_err(|e| OAuthError::ListenerBindFailed(Box::new(e)))?;
 
-        if cancel.load(Ordering::Relaxed) {
+        if cancel.load(Ordering::SeqCst) {
             return Err(OAuthError::Cancelled);
         }
 
@@ -204,16 +229,18 @@ fn receive_authorization_code(
     }
 }
 
+/// Signals the background listener thread to stop and connects a dummy stream to unblock `accept()`.
 pub(crate) fn cancel_listener(cancel: Arc<AtomicBool>, port: u16) {
-    cancel.store(true, Ordering::Relaxed);
+    cancel.store(true, Ordering::SeqCst);
     let _ = TcpStream::connect(("127.0.0.1", port));
 }
 
+/// Parses an accepted TCP connection, serves a static HTML response page, and extracts callback tokens.
 fn handle_connection(
     mut stream: TcpStream,
     port: u16,
 ) -> Result<Option<(String, String)>, OAuthError> {
-    // Bound socket timeouts so silent or slow TCP connections don't hang the single worker thread.
+    // Enforce short socket timeouts so hung local port scans or idle connections do not block the thread.
     let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
     let _ = stream.set_write_timeout(Some(Duration::from_secs(2)));
 
@@ -232,7 +259,7 @@ fn handle_connection(
     let (status_line, body) = match &parse_result {
         Ok(_) => (
             "HTTP/1.1 200 OK",
-            "<html><body>Authentication complete &mdash; you can close this tab \
+            "<html><body>Authentication complete. You can close this tab \
                 and return to the app.</body></html>",
         ),
         Err(OAuthError::InvalidCallbackTarget) => (
@@ -241,7 +268,7 @@ fn handle_connection(
         ),
         Err(_) => (
             "HTTP/1.1 400 Bad Request",
-            "<html><body>Authorization did not complete &mdash; you can close this tab \
+            "<html><body>Authorization did not complete. You can close this tab \
                 and return to the app.</body></html>",
         ),
     };
@@ -252,7 +279,6 @@ fn handle_connection(
         body
     );
 
-    // Flush and cleanly shut down the connection so browsers don't surface an early TCP RST.
     let _ = stream.write_all(response.as_bytes());
     let _ = stream.flush();
     let _ = stream.shutdown(Shutdown::Both);
@@ -265,6 +291,7 @@ fn handle_connection(
     }
 }
 
+/// Parses query parameters from the callback request target and extracts authorization code and state.
 fn parse_callback_target(port: u16, target: &str) -> Result<(String, String), OAuthError> {
     let full_url = format!("http://127.0.0.1:{port}{target}");
     let parsed = Url::parse(&full_url).map_err(|_| OAuthError::InvalidCallbackTarget)?;
@@ -273,6 +300,8 @@ fn parse_callback_target(port: u16, target: &str) -> Result<(String, String), OA
         return Err(OAuthError::InvalidCallbackTarget);
     }
 
+    // RFC 6749 Section 4.1.2.1: If the user denies authorization or provider verification fails,
+    // the server returns an "error" parameter without issuing an authorization code.
     if let Some((_, error)) = parsed.query_pairs().find(|(key, _)| key == "error") {
         let description = parsed
             .query_pairs()

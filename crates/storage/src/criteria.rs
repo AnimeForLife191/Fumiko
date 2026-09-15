@@ -1,3 +1,5 @@
+//! Database operations for user-defined watch criteria and AI classification matches.
+
 use crate::validate_limit;
 
 use super::models::{MatchedEmailWithReason, WatchCriterion};
@@ -5,23 +7,27 @@ use super::{Storage, StorageError, unix_timestamp};
 use uuid::Uuid;
 
 impl Storage {
-    /// Seeds default starter criteria on a fresh install.
+    /// Seeds default starter criteria on a fresh installation if not previously initialized.
+    ///
+    /// Uses the `has_seeded_default_criteria` setting as a persistent tombstone flag.
+    /// If the user deliberately deleted all criteria, this flag prevents the defaults
+    /// from being re-seeded on subsequent application launches.
+    ///
+    /// # Errors
+    /// Returns [`StorageError::Db`] if checking or writing default criteria records fails.
     pub async fn seed_default_criteria(&self) -> Result<(), StorageError> {
-        let already_seeded: Option<(String,)> = sqlx::query_as(
-            "SELECT value FROM settings WHERE key = 'has_seeded_default_criteria'",
-        )
-        .fetch_optional(&self.pool)
-        .await?;
+        let already_seeded: Option<(String,)> =
+            sqlx::query_as("SELECT value FROM settings WHERE key = 'has_seeded_default_criteria'")
+                .fetch_optional(&self.pool)
+                .await?;
 
         if already_seeded.is_some() {
             return Ok(());
         }
 
-        let (existing_count,): (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM watch_criteria",
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        let (existing_count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM watch_criteria")
+            .fetch_one(&self.pool)
+            .await?;
 
         if existing_count > 0 {
             sqlx::query(
@@ -35,20 +41,28 @@ impl Storage {
 
         let defaults = [
             (
-                "Careers & Interviews",
-                "Job interview invitations, recruiter outreach, screening calls, and hiring status updates.",
+                "Interview Invitations",
+                "Direct requests to schedule or confirm a job interview, phone screening, hiring call, or recruiter conversation. Does not include automated job posting alerts.",
             ),
             (
-                "Receipts & Invoices",
-                "Payment receipts, subscription renewals, invoices, order confirmations, and shipping tracking updates.",
+                "Job Alerts & Openings",
+                "Automated job recommendations, daily job match digests, and new role alerts from platforms such as Indeed, LinkedIn, ZipRecruiter, and Glassdoor.",
             ),
             (
-                "Urgent / Action Required",
-                "Direct requests requiring a prompt reply, document signature, contract review, or action under a time constraint.",
+                "Account Security & Logins",
+                "Security verification codes, multi-factor authentication (2FA/MFA) prompts, password reset links, and new sign-in or device alerts.",
+            ),
+            (
+                "Receipts & Orders",
+                "Purchase confirmations, payment receipts, subscription renewal invoices, order summaries, and package shipping or tracking updates.",
+            ),
+            (
+                "Promotions & Deals",
+                "Marketing discounts, promotional coupon codes, sales events, limited-time offers, and store deal announcements.",
             ),
         ];
 
-        let now = unix_timestamp();
+        let created_at = unix_timestamp();
 
         for (label, description) in defaults {
             let id = Uuid::now_v7().to_string();
@@ -59,7 +73,7 @@ impl Storage {
             .bind(id)
             .bind(label)
             .bind(description)
-            .bind(now)
+            .bind(created_at)
             .execute(&self.pool)
             .await?;
         }
@@ -73,7 +87,11 @@ impl Storage {
 
         Ok(())
     }
-    /// Inserts a new watch criterion for automated AI classification.
+
+    /// Inserts a new user-defined watch criterion.
+    ///
+    /// # Errors
+    /// Returns [`StorageError::Db`] if the database insert fails.
     pub async fn add_criterion(
         &self,
         label: &str,
@@ -92,7 +110,14 @@ impl Storage {
         Ok(id)
     }
 
-    /// Deletes a watch criterion and cascades deletion to all matching classification rows.
+    /// Deletes a watch criterion.
+    ///
+    /// Foreign key cascades on `classifications.criterion_id` automatically remove
+    /// all corresponding findings from the dashboard.
+    ///
+    /// # Errors
+    /// Returns [`StorageError::NotFound`] if the criterion does not exist,
+    /// or [`StorageError::Db`] if the deletion query fails.
     pub async fn delete_criterion(&self, criterion_id: Uuid) -> Result<(), StorageError> {
         let result = sqlx::query("DELETE FROM watch_criteria WHERE id = ?")
             .bind(criterion_id.to_string())
@@ -102,23 +127,29 @@ impl Storage {
         if result.rows_affected() == 0 {
             return Err(StorageError::NotFound);
         }
-        
+
         Ok(())
     }
 
-    /// Lists all watch criteria, including inactive rules.
+    /// Lists all watch criteria ordered chronologically by creation date.
+    ///
+    /// # Errors
+    /// Returns [`StorageError::Db`] if the query fails.
     pub async fn list_criteria(&self) -> Result<Vec<WatchCriterion>, StorageError> {
         let rows = sqlx::query_as::<_, WatchCriterion>(
             "SELECT id, label, description, is_active, created_at
-            FROM watch_criteria
-            ORDER BY created_at",
+             FROM watch_criteria
+             ORDER BY created_at",
         )
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
     }
 
-    /// Lists only active watch criteria used for background classification.
+    /// Lists only active watch criteria evaluated by the local AI engine.
+    ///
+    /// # Errors
+    /// Returns [`StorageError::Db`] if the query fails.
     pub async fn list_active_criteria(&self) -> Result<Vec<WatchCriterion>, StorageError> {
         let rows = sqlx::query_as::<_, WatchCriterion>(
             "SELECT id, label, description, is_active, created_at
@@ -130,6 +161,10 @@ impl Storage {
     }
 
     /// Enables or disables an individual watch criterion.
+    ///
+    /// # Errors
+    /// Returns [`StorageError::NotFound`] if the criterion ID does not exist,
+    /// or [`StorageError::Db`] if the update fails.
     pub async fn set_criterion_active(
         &self,
         criterion_id: Uuid,
@@ -148,7 +183,10 @@ impl Storage {
         Ok(())
     }
 
-    /// Counts distinct non-trashed emails that have matched at least one active criterion.
+    /// Counts non-trashed messages that have matched at least one active criterion.
+    ///
+    /// # Errors
+    /// Returns [`StorageError::Db`] if the count query fails.
     pub async fn count_classified_emails(&self) -> Result<i64, StorageError> {
         let (count,): (i64,) = sqlx::query_as(
             "SELECT COUNT(DISTINCT c.email_id)
@@ -161,7 +199,11 @@ impl Storage {
         Ok(count)
     }
 
-    /// Lists matched emails and their classification reasons across all accounts.
+    /// Lists emails matched against watch criteria across all monitored mailboxes.
+    ///
+    /// # Errors
+    /// Returns [`StorageError::InvalidInput`] if `limit` is invalid,
+    /// or [`StorageError::Db`] if the query fails.
     pub async fn list_criteria_for_all(
         &self,
         limit: i64,
@@ -194,7 +236,11 @@ impl Storage {
         Ok(rows)
     }
 
-    /// Lists matched emails and classification reasons for a specific linked account.
+    /// Lists emails matched against watch criteria for an individual account.
+    ///
+    /// # Errors
+    /// Returns [`StorageError::InvalidInput`] if `limit` is invalid,
+    /// or [`StorageError::Db`] if the query fails.
     pub async fn list_criteria_for_account(
         &self,
         account_id: Uuid,
@@ -229,7 +275,10 @@ impl Storage {
         Ok(rows)
     }
 
-    /// Removes a specific classification link between an email and a criterion.
+    /// Removes an individual email classification link from the findings board.
+    ///
+    /// # Errors
+    /// Returns [`StorageError::Db`] if the deletion query fails.
     pub async fn delete_classification(
         &self,
         email_id: Uuid,
@@ -244,7 +293,13 @@ impl Storage {
         Ok(())
     }
 
-    /// Records or updates an AI classification match with its confidence score.
+    /// Saves or updates an AI classification match with its confidence score.
+    ///
+    /// Uses composite `ON CONFLICT(email_id, criterion_id)` to update scores idempotently
+    /// if a message is re-evaluated across sync passes.
+    ///
+    /// # Errors
+    /// Returns [`StorageError::Db`] if the upsert query fails.
     pub async fn save_classification(
         &self,
         email_id: Uuid,

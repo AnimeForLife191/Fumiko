@@ -1,155 +1,123 @@
-# Connecting an Email Account with OAuth
+# Connecting an Email Account with OAuth and App Passwords
 
-OAuth allows Fumiko to access a user's mailbox without ever asking for, seeing, or storing their account password. The email provider handles identity verification, two-factor challenges, and consent screens. Fumiko simply receives short-lived access credentials and an encrypted refresh token scoped strictly to reading mail.
+Fumiko supports two authentication models: modern OAuth 2.0 PKCE for major cloud providers, and direct IMAP authentication with App Passwords for generic mailboxes or users who prefer not to create cloud developer keys.
 
-This document explains the technical design of Fumiko's desktop OAuth 2.0 flow in the `oauth` crate. It covers our protocol choices, platform quirks, and security tradeoffs.
+This document explains the technical design of Fumiko's desktop authentication flows, how credentials are handled across crates, and how platform quirks are managed.
 
----
+## Subsystem Division of Work
 
-## Supported Providers
+Connecting and authenticating accounts involves cooperation between two crates:
 
-Fumiko currently supports two email ecosystems:
+* **`oauth` crate**: Implements the RFC 8252 dynamic loopback listener, S256 PKCE exchange, constant-time CSRF verification, token refresh loops, and the unified `get_access_token_for_account` credential hydrator.
+* **`email_core` crate**: Implements IMAP TLS connection handling, pre-flight live login verification over raw sockets, and protocol-level mailbox commands.
 
-1. **Gmail**, via Google OAuth 2.0.
-2. **Outlook / Microsoft 365**, via the Microsoft identity platform.
+## Supported Authentication Methods
 
-For Microsoft, the app targets the multi-tenant `common` endpoint, supporting both personal accounts and work or school accounts. In practice, there is a key permissions difference:
+1. **Google OAuth 2.0**: Uses a dynamic loopback authorization code flow with PKCE. Requires user-supplied or bundled Google Cloud Console client credentials.
+2. **Microsoft Identity Platform**: Uses PKCE against the `common` endpoint, specifically targeting personal Microsoft accounts (`@outlook.com`, `@hotmail.com`, `@live.com`, `@msn.com`). Organizational (Work/School) accounts are intentionally restricted due to enterprise Publisher Verification requirements.
+3. **IMAP with App Passwords**: Connects via TLS to standard IMAP endpoints (Gmail, iCloud, Yahoo, Fastmail, or custom servers). Users generate a dedicated App Password from their provider, bypassing cloud developer console setup entirely.
 
-* **Personal Microsoft accounts** (`@outlook.com`, `@hotmail.com`, `@live.com`): Connect immediately with standard user consent.
-* **Work or school accounts** (Office 365 / Entra ID): The protocol supports them, but Microsoft restricts unverified multi-tenant apps from organizational tenants by default. Unless an institutional IT administrator has enabled user consent or explicitly approves the client ID, signing into a work or school account will show a "Need admin approval" screen.
+## Provider Representation and Storage Mapping
 
-Providers are stored alongside account metadata in SQLite using lowercase identifiers (`gmail` and `outlook`). Any unrecognized provider string is rejected during linking rather than coerced into a default.
+To maintain strict type safety, provider identities exist at two levels:
 
----
+1. **In the Rust Type System**:
+   * The `oauth` crate defines `OAuthProvider` with two variants: `Google` and `Microsoft`.
+   * The `common` crate defines `Provider` with three variants: `Gmail`, `Outlook`, and `Imap`.
+   * `OAuthProvider` implements `From` and `TryFrom` to convert to and from `common::Provider`. Converting from `Provider::Imap` returns an error because IMAP mailboxes do not use OAuth.
+2. **In SQLite Storage**:
+   * The `common::Provider` enum serializes using lowercase formatting (`#[serde(rename_all = "lowercase")]`).
+   * In the SQLite `linked_accounts` table, the `provider` column stores these values as plain text strings: `'gmail'`, `'outlook'`, or `'imap'`.
 
-## The Sign-In Lifecycle
+## The OAuth Sign-In Lifecycle
 
-The authorization lifecycle coordinates a temporary local web server, the system default browser, and the remote provider through an authorization code flow with PKCE.
+The OAuth authorization lifecycle coordinates a temporary local web server, the system default browser, and the remote provider through an authorization code flow with PKCE.
 
 ### Step-by-Step Flow
 
-1. **Credential Resolution**: Fumiko loads the provider's OAuth client settings. If the user saved custom developer credentials in the app, those take priority over bundled development keys.
-2. **Ephemeral Loopback Binding**: Fumiko binds a standard `TcpListener` to `127.0.0.1:0`. Passing port `0` tells the operating system kernel to assign an available dynamic port.
+1. **Credential Resolution**: Fumiko loads the provider's OAuth client settings via `load_credentials`. If the user saved custom developer credentials in the app, those take priority over bundled development keys.
+2. **Ephemeral Loopback Binding**: Fumiko binds a standard `TcpListener` to `127.0.0.1:0`. Passing port `0` tells the operating system kernel to assign an available dynamic port, avoiding port collisions and allowing concurrent logins.
 3. **Client and URL Construction**: The OAuth client sets up its endpoints using the dynamically assigned port to construct the exact redirect URI: `http://127.0.0.1:{port}/`.
-4. **PKCE and State Generation**: A cryptographically random PKCE verifier and challenge pair is generated, along with an unguessable CSRF state token.
-5. **Browser Handoff**: Fumiko launches the user's default browser pointing to the provider's sign-in screen, passing the PKCE challenge, state token, required scopes, and extra provider parameters.
-6. **Local Callback Processing**: A background worker listens for the browser redirect. The worker enforces short socket read timeouts to prevent silent port scans from hanging the thread, parses the authorization code, serves a confirmation page, and cleanly flushes the TCP socket.
-7. **Immediate Cancellation Support**: If the user clicks Cancel in Fumiko or closes the window, the background task is dropped. This triggers a `ListenerGuard` that makes a quick dummy connection to the loopback port, unblocking `listener.accept()` and freeing the port right away.
-8. **CSRF Validation**: Fumiko compares the returned state string against the original state token using a constant-time byte check.
-9. **Token Exchange**: Fumiko makes a direct HTTPS request to the provider token endpoint, trading the authorization code and PKCE verifier for an access token and a refresh token.
-10. **Secure Storage**: The access token stays strictly in memory for active syncing. The long-lived refresh token is saved directly into the operating system keyring, and non-sensitive account metadata is written to SQLite.
+4. **PKCE and State Generation**: A cryptographically random PKCE verifier and challenge pair is generated (`PkceCodeChallenge::new_random_sha256()`), along with an unguessable CSRF state token (`CsrfToken::new_random`).
+5. **Browser Handoff**: Fumiko launches the user's default browser pointing to the provider's sign-in screen, passing the PKCE challenge, state token, required scopes, and provider-specific parameters.
+6. **Local Callback Processing**: A background worker on Tokio's blocking thread pool (`receive_authorization_code`) listens for the browser redirect. The worker enforces a 2-second socket read timeout to prevent silent port scans from hanging the thread, parses the authorization code, serves a static HTML confirmation page, and cleanly shuts down the TCP stream.
+7. **Immediate Cancellation Support**: If the user clicks Cancel in Fumiko or closes the window, the background task is dropped. This triggers a `ListenerGuard` that connects a dummy TCP stream to the loopback port, unblocking `listener.accept()` and freeing the port right away.
+8. **CSRF Validation**: Fumiko compares the returned state string against the original state token using a constant-time byte check (`constant_time_eq`) to eliminate timing side channels.
+9. **Token Exchange**: Fumiko makes a direct HTTPS request to the provider token endpoint via `reqwest` with redirects disabled, trading the authorization code and private PKCE verifier for an access token and refresh token.
+10. **Secure Storage**: The short-lived access token stays strictly in memory for active syncing. The long-lived refresh token is saved directly into the operating system keyring, and non-sensitive account metadata is written to SQLite.
 
----
+## The IMAP Authentication Lifecycle
+
+For users connecting without cloud developer credentials:
+
+1. **Server and Credential Collection**: The user enters their email address, server host, port, and provider-generated App Password.
+2. **Preset Configuration**: Common endpoints (such as `imap.gmail.com:993` or `imap.mail.me.com:993`) are auto-populated.
+3. **Password Normalization**: Generators from Google and Apple display passwords in 4-character spaced groups (like `abcd efgh ijkl mnop`). Fumiko strips whitespace automatically to prevent authentication rejections.
+4. **Pre-flight Live Login**: Before writing any data to SQLite, Fumiko opens a TLS socket to the server and executes an IMAP `LOGIN` via `email_core`. If login fails, an actionable error is returned immediately.
+5. **Keyring Storage**: Once verified, the App Password is saved into the operating system keyring keyed by the account UUID. The plain password is never saved to SQLite tables.
 
 ## Redirect URI Registration and RFC 8252
 
-Fumiko registers an explicit, portless loopback redirect URI in developer consoles:
+For OAuth providers, Fumiko registers an explicit, portless loopback redirect URI in developer consoles:
 
 ```
 http://127.0.0.1/
 ```
 
 ### Why Ephemeral Ports Work
-Under RFC 8252 Section 7.3 (OAuth 2.0 for Native Apps), identity providers supporting desktop and native clients allow loopback redirect URIs to match any port at runtime. When registering a native client with Google (Application Type: Desktop App) or Microsoft (Platform: Mobile and desktop applications), the provider checks the scheme, host, and path, while allowing the port component to vary dynamically.
+Under RFC 8252 Section 7.3 (OAuth 2.0 for Native Apps), identity providers supporting desktop and native clients allow loopback redirect URIs to match any port at runtime. When registering a native client with Google (Desktop App) or Microsoft (Mobile and desktop applications), the provider checks the scheme, host, and path, while allowing the port component to vary dynamically.
 
 This eliminates two major failure modes:
 * **Port Collisions**: If another application or a zombie process is holding a hardcoded port open, sign-in will not crash or fail to bind.
 * **Concurrent Logins**: A user can link multiple accounts in parallel without separate attempts fighting over the same local socket.
 
-### Why We Strictly Use `127.0.0.1` Over `localhost`
-Many developer guides suggest registering `http://localhost`, but Fumiko registers, binds, and redirects strictly using the numeric IPv4 address `http://127.0.0.1/`.
-
+### Why We Strictly Use 127.0.0.1 Over localhost
 Modern operating systems and web browsers frequently resolve the hostname `localhost` to the IPv6 loopback address `::1` first. If an application only binds its listener to IPv4 `127.0.0.1`, a browser redirecting to `localhost` will try IPv6 first and fail immediately with a connection refused error. RFC 8252 specifically recommends using the explicit literal IPv4 loopback address to avoid this ambiguity across platforms.
 
-### Network Binding: `127.0.0.1` vs `localhost`
-While developer portals often suggest `http://localhost`, Fumiko binds strictly to `127.0.0.1` and uses the numeric IPv4 address in the redirect URI. Many operating systems resolve the word `localhost` to IPv6 `::1` first. If a socket is only bound to IPv4, a browser redirecting to `localhost` can fail with a connection refused error. Using explicit IPv4 prevents that issue.
+## Unified Secret Storage in the OS Keyring
 
----
+Fumiko maintains a strict separation between non-sensitive metadata and sensitive authentication secrets:
 
-## Why Both PKCE and State Are Mandatory
+* **SQLite Database**: Stores account IDs, email addresses, display names, sync cursors, provider identifiers, IMAP hosts/ports, and custom Client IDs. It never contains client secrets, refresh tokens, or passwords.
+* **Operating System Keyring**: Sensitive credentials live exclusively in the native OS credential vault (Apple Keychain, Windows Credential Manager, or Linux Secret Service).
 
-Although PKCE and state tokens both use random strings, they protect against completely different attack vectors. You need both.
+Each account has one primary authentication secret stored in the OS keyring under its account UUID string:
+* For OAuth accounts: an encrypted **OAuth refresh token**.
+* For IMAP accounts: an encrypted **App Password**.
 
-* **PKCE (Proof Key for Code Exchange)**: Protects the authorization code while in transit. If another local process snoops on the browser redirect and steals the code, it cannot redeem it because it does not have the private PKCE verifier held in Fumiko's memory.
-* **State Token**: Protects the client app against cross-site request forgery. If someone tries to trick Fumiko into linking an attacker-controlled mailbox by injecting a stray callback, the state token will not match, and Fumiko rejects the request.
+The `TokenStore` abstraction manages both through unified `save_account_secret`, `get_account_secret`, and `delete_account_secret` methods. When an account is deleted or wiped, its secret is purged from the keyring regardless of whether it connected via OAuth or IMAP.
 
----
-
-## Client Credentials and Build-Time Secrets
-
-### Public vs Confidential Clients
-* **Google** acts as a confidential client in our desktop configuration, requiring both a `client_id` and a `client_secret`.
-* **Microsoft** uses a public native client registration for desktop applications, requiring only a `client_id` without any client secret.
-
-### The `option_envc!` Macro and `build.rs` Isolation
-To allow development builds without requiring manual environment exports, bundled development credentials are encrypted directly into the binary at compile time via `envcrypt::option_envc!`.
-
-Because `option_envc!` runs at compile time, each crate using it maintains its own `build.rs` script that loads the workspace root `.env` file via `dotenvy` and forwards the values using `cargo:rustc-env`. Directives emitted by `cargo:rustc-env` only apply to that specific crate and do not leak across dependencies.
-
-User-provided credentials entered through the in-app settings always take precedence over bundled development values.
-
----
-
-## Token Storage and Keyring Lifecycle
-
-Fumiko keeps a clear boundary between non-sensitive metadata and sensitive authentication secrets:
-
-* **SQLite Database**: Stores account IDs, email addresses, display names, sync cursors, provider identifiers, and custom Client IDs (saved in the local settings table). It never contains client secrets, refresh tokens, or account passwords.
-* **Operating System Keyring**: Sensitive secrets live exclusively in the native OS credential vault (Apple Keychain, Windows Credential Manager, or Linux Secret Service). This includes account refresh tokens (indexed by account UUID) and user-supplied Google Client Secrets.
-
-If a user copies, inspects, or backs up their local SQLite database file, no usable secrets or refresh tokens are ever exposed.
-
-### Refresh Token Rotation
-When Fumiko uses a refresh token to fetch a new access token, the provider may optionally return a replacement refresh token:
-* If the provider returns a new refresh token, Fumiko updates the keyring entry with the new value.
-* If the provider omits a replacement, Fumiko keeps the existing token.
-
-This keeps accounts working smoothly even when providers enforce single-use refresh tokens.
-
----
-
-## Error Handling and Edge Cases
-
-The `oauth` crate separates failures by their actual cause so the UI can respond appropriately:
-
-1. **User Denial (`error=access_denied`)**: The user clicked Cancel on the provider consent screen. This is treated as a routine action rather than an alarming crash.
-2. **Provider Errors (`server_error`, `temporarily_unavailable`)**: The provider had an issue on their side. These are flagged so the UI can suggest retrying shortly.
-3. **Malformed or Unrelated Callbacks**: Stray local traffic (like a browser asking for `/favicon.ico` or background port scans) receives a 404 response and is ignored without closing the listener loop.
-4. **Timeouts and Cancellation**: If the user abandons the browser window, the attempt expires after 120 seconds. If the user clicks Cancel in Fumiko, the listener task drops immediately and unblocks the socket via an internal loopback ping.
-5. **CSRF State Mismatches**: If the returned state does not match what was sent, the request is rejected immediately using constant-time byte comparison.
-
----
+### Credential Caching and Memory Safety
+To avoid frequent OS IPC calls into system keychains during background sync loops, active credentials are cached in memory using a `TokenSet`:
+* **OAuth Access Tokens**: Providers typically issue access tokens with a 60-minute lifetime. Fumiko applies a proactive 10-minute safety buffer (capped at 50 minutes TTL) so active sync loops never attempt requests with an expiring token. When expired, the refresh token is used to exchange for a new access token.
+* **IMAP App Passwords**: App passwords do not expire on the provider's server. However, Fumiko assigns them the same in-memory 50-minute TTL to enforce RAM cache eviction hygiene. After 50 minutes, the password is removed from memory and safely re-read on demand from the encrypted OS keyring.
 
 ## Scopes and the Microsoft Personal Account Quirk
 
-Scopes are passed in by the caller rather than hardcoded into the OAuth client, keeping the authentication library modular.
+Scopes are passed in by the caller rather than hardcoded into the OAuth client:
 
 ### Baseline Scopes
 * **Gmail**: `https://www.googleapis.com/auth/gmail.readonly`
 * **Outlook**: `https://graph.microsoft.com/Mail.Read`, `https://graph.microsoft.com/User.Read`, `offline_access`
 
-### The `User.Read` Requirement on Personal Microsoft Accounts
-Microsoft Graph uses the multi-tenant `common` endpoint to authenticate both work/school accounts and personal accounts (`@outlook.com`, `@hotmail.com`, `@live.com`).
+### The User.Read and offline_access Requirements on Personal Microsoft Accounts
+Microsoft Identity's `common` endpoint is designed to accept both consumer and organizational identities. However, because enterprise and educational Microsoft 365 tenants block unverified multi-tenant apps by default without official Publisher Verification (requiring legal entity registration and D-U-N-S audits), Fumiko focuses exclusively on personal consumer accounts (`@outlook.com`, `@hotmail.com`, `@live.com`, `@msn.com`).
 
-On personal Microsoft accounts, requesting only `Mail.Read` will let the user sign in, but subsequent calls to `GET /me` (to fetch their display name and email address) will fail with an unexpected `401 UnknownError`. Microsoft Graph strictly requires the `User.Read` scope alongside `Mail.Read` to access basic profile details on personal accounts. Always include `User.Read`.
+Connecting personal Microsoft accounts involves two mandatory scope requirements alongside `Mail.Read`:
 
----
-
-## Known Limitations
-
-* **Live Token CI Tests**: Unit tests cover state validation, callback parsing, URL decoding, and cancellation pings. However, full end-to-end token exchanges are not run in standard CI because they require live mock identity provider endpoints.
-
----
+* **`User.Read` (Profile Discovery):** On personal Microsoft accounts, requesting only `Mail.Read` permits the user to sign in, but subsequent calls to `GET /me` (to fetch their display name and email address for account records) will fail with an unexpected `401 UnknownError`. Microsoft Graph strictly requires `User.Read` alongside `Mail.Read` to access basic profile details on consumer accounts. Always include `User.Read`.
+* **`offline_access` (Refresh Token Issuance):** Unlike Google (which controls refresh tokens via an `access_type=offline` URL query parameter), Microsoft Identity v2.0 requires an explicit `offline_access` scope. If `offline_access` is omitted, Microsoft returns only a short-lived access token (valid for roughly 60 minutes) and omits the `refresh_token` entirely. For a persistent desktop inbox watcher, this scope is mandatory so background sync workers can rotate expired tokens directly from the OS keyring without forcing the user to re-authenticate in the browser every hour.
 
 ## Security Checklist
 
 When touching authentication code or adding new providers, keep these rules in place:
 
-* Always bind desktop callbacks strictly to `127.0.0.1` and never listen on public interfaces (`0.0.0.0`).
+* Bind desktop OAuth callbacks strictly to `127.0.0.1` and never listen on public interfaces (`0.0.0.0`).
 * Use dynamic OS-assigned ports (`:0`) to avoid port conflicts.
 * Generate a fresh S256 PKCE challenge for every sign-in attempt, even for clients with secrets.
-* Validate CSRF state tokens byte-by-byte in constant time.
+* Validate CSRF state tokens byte-by-byte in constant time using XOR accumulation.
 * Enforce read and write timeouts on incoming TCP connections so idle connections do not block the thread.
-* Explicitly flush and shut down sockets before closing them to prevent browser reset errors.
-* Store refresh tokens exclusively in the operating system keyring, never in SQLite tables.
+* Store refresh tokens and app passwords exclusively in the operating system keyring, never in SQLite tables.
+* Normalize app passwords: trim whitespace and strip space groups before initiating IMAP verification.
+* Enforce pre-flight credential verification: never save an account record to SQLite before verifying the connection with the remote provider.
 * Implement redacted `Debug` formatters on credential structs to prevent accidental secret leaks in application logs.

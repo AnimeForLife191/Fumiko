@@ -5,9 +5,10 @@ edition = "2024"
 
 [dependencies]
 common.workspace = true
-
 futures-util = "0.3"
+tracing.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
+async-trait.workspace = true

@@ -19,9 +19,10 @@
     --text-muted: #9484b3;
     --text-on-accent: #ffffff;
     --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --color-scheme: dark;
 
     /* ==========================================================================
-       3. Primary Accent (Default: Violet)
+       3. Primary Accent (Violet)
        ========================================================================== */
     --accent-primary: #8b5cf6;
     --accent-primary-bright: #b794ff;
@@ -31,7 +32,7 @@
     --accent-primary-glow: rgba(139, 92, 246, 0.38);
 
     /* ==========================================================================
-       4. Secondary Accent (Default: Coral / Rose)
+       4. Secondary Accent (Coral / Rose)
        ========================================================================== */
     --accent-secondary: #ff7f8a;
     --accent-secondary-bright: #ffa4ad;
@@ -71,11 +72,13 @@
     --gradient-danger: linear-gradient(120deg, var(--accent-danger-deep), var(--accent-danger));
 
     /* ==========================================================================
-       8. Sizing, Radii, Shadows & Transitions
+       8. Sizing, Radii, Shadows, Layout & Transitions
        ========================================================================== */
     --sidebar-width: 250px;
     --page-max-width: 1080px;
     --page-max-width-wide: 100%;
+    --split-list-min: 340px;
+    --split-list-max: 400px;
     
     --radius-sm: 6px;
     --radius-md: 10px;
@@ -86,25 +89,154 @@
     --panel-shadow: 0 14px 36px rgba(5, 3, 12, 0.45);
     --sidebar-shadow: 4px 0 24px rgba(0, 0, 0, 0.35);
     --banner-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+
+    --scrollbar-size: 6px;
+    --scrollbar-thumb: var(--border-subtle);
+    --scrollbar-thumb-hover: var(--accent-primary-bright);
+
+    /* Reading Pane & Email Body Tokens */
+    --reading-pane-padding: 24px 28px;
+    --reading-pane-title-size: 20px;
+    --reading-pane-attachments-bg: var(--bg-surface-card);
+    --email-frame-bg: #ffffff;
+    --email-frame-min-height: 480px;
+    --email-text-bg: var(--bg-surface-card);
+
+    /* ==========================================================================
+       9. Icon Masks & Visual Assets
+       ========================================================================== */
+    --icon-mail: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7'/%3E%3Crect x='2' y='4' width='20' height='16' rx='2'/%3E%3C/svg%3E");
+    --icon-search: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21 21-4.34-4.34'/%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3C/svg%3E");
+    --icon-mails: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 1-1.732'/%3E%3Cpath d='m22 5.5-6.419 4.179a2 2 0 0 1-2.162 0L7 5.5'/%3E%3Crect x='7' y='3' width='15' height='12' rx='2'/%3E%3C/svg%3E");
+    --icon-trash: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 11v6'/%3E%3Cpath d='M14 11v6'/%3E%3Cpath d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6'/%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/%3E%3C/svg%3E");
+    --icon-settings: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E");
+    --icon-info: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 16v-4'/%3E%3Cpath d='M12 8h.01'/%3E%3C/svg%3E");
+    --icon-edit: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z'/%3E%3Cpath d='m15 5 4 4'/%3E%3C/svg%3E");
+    --icon-external-link: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'/%3E%3Cpolyline points='15 3 21 3 21 9'/%3E%3Cline x1='10' y1='14' x2='21' y2='3'/%3E%3C/svg%3E");
+    --icon-chevron-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    --icon-flower: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='%23FFA9BA' d='M475.539 198.425c-2.007-5.904 2.156-13.382 10.772-21.137c3.44-3.096 3.889-8.305 1.173-12.052c-23.598-32.546-65.977-48.31-106.704-36.215a98.05 98.05 0 0 0-15.991 6.314c-6.649 3.328-14.239-2.335-12.947-9.657a98.107 98.107 0 0 0 1.487-17.055c0-44.619-29.975-82.231-70.885-93.811c-4.513-1.278-9.22 1.134-10.923 5.505c-4.717 12.101-10.84 19.411-17.533 19.411c-6.551 0-12.555-7.003-17.229-18.646c-1.759-4.38-6.669-6.634-11.157-5.172c-39.044 12.724-67.261 49.421-67.261 92.712c0 5.798.506 11.479 1.477 16.999c1.287 7.316-6.293 12.972-12.94 9.655a98.092 98.092 0 0 0-15.875-6.256c-44.043-13.08-90.014 6.42-112.081 44.489c-2.354 4.061-1.204 9.225 2.614 11.957c10.812 7.738 16.524 15.646 14.802 22.215c-1.668 6.362-10.023 10.403-22.554 11.961c-4.744.59-8.148 4.863-7.814 9.632c2.756 39.384 29.443 74.763 69.52 86.665a98.146 98.146 0 0 0 14.438 3.133c7.222 1.004 10.349 9.68 5.427 15.06a98.192 98.192 0 0 0-9.121 11.623C60.18 384.635 65.817 435.47 97.11 467.788c2.702 2.791 6.921 3.594 10.425 1.916c6.878-3.293 12.693-3.915 16.675-1.261c3.835 2.556 5.515 7.852 5.283 15.043c-.126 3.906 2.315 7.475 6.009 8.749c40.818 14.073 87.547-.377 112.714-37.935l.089-.133c3.635-5.444 11.535-5.444 15.17 0l.089.133c27.591 41.174 81.096 54.579 124.316 33.073c3.576-1.779 5.512-5.718 4.853-9.657c-1.456-8.698-.316-15.255 3.848-18.455c3.829-2.943 9.743-2.684 16.913.211c3.832 1.547 8.269.265 10.656-3.109c22.675-32.05 24.554-76.051 1.397-110.607a98.192 98.192 0 0 0-9.121-11.623c-4.922-5.38-1.796-14.056 5.427-15.06a98.146 98.146 0 0 0 14.438-3.133c44.103-13.098 71.995-54.626 69.618-98.637c-.247-4.573-3.816-8.327-8.384-8.646c-11.864-.83-19.946-4.233-21.986-10.232zm-219.59 69.373l-.057.294l-.057-.294l.354-.392l-.24.392z'/%3E%3Cpath fill='%23E6A4FF' d='M345.186 368.042a11.903 11.903 0 0 1-8.392-3.447l-89.351-88.306c-4.689-4.635-4.734-12.193-.1-16.883c4.635-4.69 12.193-4.733 16.883-.1l89.351 88.306c4.689 4.635 4.734 12.193.1 16.883a11.901 11.901 0 0 1-8.491 3.547z'/%3E%3Cpath fill='%23FF6E83' d='M351.021 238.828c-4.531-16.939-21.934-26.999-38.874-22.468l-24.598 6.579v-25.463c0-17.534-14.215-31.749-31.749-31.749s-31.749 14.215-31.749 31.749v25.656l-24.814-6.517c-16.957-4.452-34.318 5.684-38.772 22.644c-4.454 16.959 5.684 34.318 22.643 38.772l20.995 5.514l-14.293 20.843c-9.917 14.461-6.233 34.223 8.229 44.139a31.598 31.598 0 0 0 17.927 5.568c10.116 0 20.059-4.824 26.212-13.797l13.032-19.005l12.636 19.27c6.096 9.296 16.235 14.342 26.579 14.342a31.598 31.598 0 0 0 17.38-5.203c14.663-9.615 18.755-29.297 9.14-43.96l-14.51-22.127l22.117-5.915c16.941-4.528 27-21.933 22.469-38.872z'/%3E%3Ccircle fill='%23FFD469' cx='255.835' cy='267.798' r='30.165'/%3E%3Cpath fill='%23FFEED4' d='M367.149 291.758l-107.558-25.862l18.068-82.27a3 3 0 0 0-2.286-3.574a2.995 2.995 0 0 0-3.573 2.287l-17.254 78.562l-61.095-87.885a3 3 0 0 0-4.927 3.425l62.815 90.358l-75.379 40.281a3 3 0 1 0 2.828 5.292l77.092-41.197l109.867 26.417a3.003 3.003 0 0 0 3.618-2.216a3 3 0 0 0-2.216-3.618z'/%3E%3Cpath fill='%23FF473E' d='M208.987 174.728c0 9.941-8.059 18-18 18s-18-8.059-18-18s8.059-18 18-18s18 8.059 18 18zM378.416 308.12c7.425-6.61 8.087-17.987 1.477-25.413c-6.61-7.425-17.988-8.087-25.413-1.477c-7.425 6.61-8.087 17.987-1.477 25.413c6.61 7.425 17.987 8.087 25.413 1.477zm-90.225-137.087c-6.599-7.435-17.976-8.112-25.411-1.513c-7.435 6.599-8.112 17.976-1.513 25.411c6.599 7.435 17.976 8.112 25.411 1.513c7.435-6.599 8.112-17.976 1.513-25.411zM159.569 307.084c-1.459 9.833 5.33 18.988 15.163 20.447c9.833 1.459 18.988-5.329 20.447-15.163c1.459-9.833-5.33-18.988-15.163-20.447s-18.988 5.329-20.447 15.163z'/%3E%3C/svg%3E");
+
+    --icon-empty: var(--icon-flower);
+    --empty-state-icon-size: 44px;
+    --empty-state-icon-glow: var(--accent-secondary-glow);
 }
 
-/* Base resets & typography */
+/* ==========================================================================
+   Base Resets & Typography
+   ========================================================================== */
 html, body {
     margin: 0;
     height: 100%;
     background: var(--bg-primary);
     color: var(--text-primary);
-    color-scheme: dark;
+    color-scheme: var(--color-scheme, dark);
     font-family: var(--font-family);
     -webkit-font-smoothing: antialiased;
 }
 
-/* Shared Empty State Component */
+/* ==========================================================================
+   Global Icon Utilities
+   ========================================================================== */
+.icon {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    background-color: currentColor;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    vertical-align: middle;
+    flex-shrink: 0;
+}
+
+.icon--mail {
+    -webkit-mask-image: var(--icon-mail);
+    mask-image: var(--icon-mail);
+}
+
+.icon--search {
+    -webkit-mask-image: var(--icon-search);
+    mask-image: var(--icon-search);
+}
+
+.icon--mails {
+    -webkit-mask-image: var(--icon-mails);
+    mask-image: var(--icon-mails);
+}
+
+.icon--trash {
+    width: 14px;
+    height: 14px;
+    -webkit-mask-image: var(--icon-trash);
+    mask-image: var(--icon-trash);
+}
+
+.icon--settings {
+    width: 16px;
+    height: 16px;
+    -webkit-mask-image: var(--icon-settings);
+    mask-image: var(--icon-settings);
+}
+
+.icon--info {
+    width: 18px;
+    height: 18px;
+    -webkit-mask-image: var(--icon-info);
+    mask-image: var(--icon-info);
+}
+
+.icon--edit {
+    width: 13px;
+    height: 13px;
+    -webkit-mask-image: var(--icon-edit);
+    mask-image: var(--icon-edit);
+}
+
+.icon--external-link {
+    width: 12px;
+    height: 12px;
+    -webkit-mask-image: var(--icon-external-link);
+    mask-image: var(--icon-external-link);
+}
+
+.icon--chevron-down {
+    width: 14px;
+    height: 14px;
+    -webkit-mask-image: var(--icon-chevron-down);
+    mask-image: var(--icon-chevron-down);
+}
+
+.icon--flower {
+    width: 38px;
+    height: 38px;
+    background: var(--icon-flower) no-repeat center / contain;
+    -webkit-mask: none;
+    mask: none;
+    margin-bottom: 8px;
+    filter: drop-shadow(0 0 10px var(--empty-state-icon-glow));
+}
+
+.icon--empty {
+    width: var(--empty-state-icon-size);
+    height: var(--empty-state-icon-size);
+    background: var(--icon-empty) no-repeat center / contain;
+    -webkit-mask: none;
+    mask: none;
+    filter: drop-shadow(0 0 12px var(--empty-state-icon-glow));
+}
+
+/* ==========================================================================
+   Shared Empty State Component
+   ========================================================================== */
 .empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    flex: 1 1 auto;
     gap: 8px;
     min-height: 220px;
     padding: 48px 24px;
@@ -115,9 +247,21 @@ html, body {
 }
 
 .empty-state__icon {
-    font-size: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+    flex-shrink: 0;
+}
+
+.empty-state__icon.icon {
+    width: var(--empty-state-icon-size);
+    height: var(--empty-state-icon-size);
+}
+
+.empty-state__icon--text {
+    font-size: var(--empty-state-icon-size);
     line-height: 1;
-    margin-bottom: 6px;
     opacity: 0.85;
 }
 
@@ -136,10 +280,12 @@ html, body {
     line-height: 1.5;
 }
 
-/* Responsive Split View Grid */
+/* ==========================================================================
+   Responsive Split View Grid
+   ========================================================================== */
 .split-view {
     display: grid;
-    grid-template-columns: minmax(340px, 400px) minmax(0, 1fr);
+    grid-template-columns: minmax(var(--split-list-min), var(--split-list-max)) minmax(0, 1fr);
     gap: 18px;
     width: 100%;
     height: 100%;
@@ -161,14 +307,16 @@ html, body {
     box-shadow: var(--panel-shadow);
 }
 
-/* Reading Pane Component Styles */
+/* ==========================================================================
+   Reading Pane Component Styles
+   ========================================================================== */
 .reading-pane {
     display: flex;
     flex-direction: column;
     flex: 1 1 auto;
     height: 100%;
     min-height: 0;
-    padding: 24px 28px;
+    padding: var(--reading-pane-padding);
     box-sizing: border-box;
     overflow-y: auto;
 }
@@ -190,7 +338,7 @@ html, body {
 
 .reading-pane__title {
     margin: 0;
-    font-size: 22px;
+    font-size: var(--reading-pane-title-size);
     font-weight: 750;
     line-height: 1.3;
     color: var(--text-primary);
@@ -226,14 +374,6 @@ html, body {
     box-shadow: 0 2px 8px var(--accent-primary-glow);
 }
 
-.reading-pane__title {
-    margin: 0 0 8px;
-    font-size: 22px;
-    font-weight: 750;
-    line-height: 1.3;
-    color: var(--text-primary);
-}
-
 .reading-pane__sender {
     margin: 0;
     color: var(--text-secondary);
@@ -248,16 +388,23 @@ html, body {
     width: 100%;
 }
 
+.reading-pane__empty-text {
+    margin: 20px 0;
+    color: var(--text-muted);
+    font-size: 13.5px;
+    font-style: italic;
+}
+
 .reading-pane__attachments {
     flex: 0 0 auto;
     margin-top: 20px;
     padding: 16px 20px;
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
-    background: var(--bg-surface-raised);
+    background: var(--reading-pane-attachments-bg);
 }
 
-.reading-pane__attachments h3 {
+.reading-pane__attachments-title {
     margin: 0 0 10px;
     color: var(--text-primary);
     font-size: 13.5px;
@@ -293,10 +440,41 @@ html, body {
     display: none;
 }
 
-/* Custom Scrollbars */
+/* ==========================================================================
+   Email Body Containers (HTML Iframe & Plaintext Fallback)
+   ========================================================================== */
+.email-body__frame {
+    display: block;
+    width: 100%;
+    flex: 1 1 auto;
+    height: 100%;
+    min-height: var(--email-frame-min-height);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: var(--email-frame-bg);
+    color-scheme: light;
+    box-sizing: border-box;
+}
+
+.email-body-text {
+    flex: 1 1 auto;
+    margin: 0;
+    padding: 16px;
+    border-radius: var(--radius-sm);
+    background: var(--email-text-bg);
+    color: var(--text-primary);
+    font-family: inherit;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    box-sizing: border-box;
+}
+
+/* ==========================================================================
+   Custom Scrollbars
+   ========================================================================== */
 ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
 }
 
 ::-webkit-scrollbar-track {
@@ -304,14 +482,17 @@ html, body {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--border-subtle);
+    background: var(--scrollbar-thumb);
     border-radius: var(--radius-pill);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--accent-primary-bright);
+    background: var(--scrollbar-thumb-hover);
 }
 
+/* ==========================================================================
+   Responsive Rules
+   ========================================================================== */
 @media (max-width: 900px) {
     .split-view {
         grid-template-columns: 1fr;

@@ -1,4 +1,6 @@
-use self_update::{cargo_crate_version, VersionStatus};
+//! In-place binary self-updating using the GitHub Releases API.
+
+use self_update::{VersionStatus, cargo_crate_version};
 use tracing::{error, info, warn};
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
@@ -7,8 +9,12 @@ const REPO_OWNER: &str = "AnimeForLife191";
 const REPO_NAME: &str = "Fumiko";
 const BIN_NAME: &str = "fumiko";
 
+/// Synchronously queries GitHub releases for updates.
 fn check_sync() -> Result<Option<String>, BoxError> {
-    info!("Checking GitHub releases for {}/{}...", REPO_OWNER, REPO_NAME);
+    info!(
+        "Checking GitHub releases for {}/{}...",
+        REPO_OWNER, REPO_NAME
+    );
 
     let releases = self_update::backends::github::ReleaseList::configure()
         .repo_owner(REPO_OWNER)
@@ -20,10 +26,14 @@ fn check_sync() -> Result<Option<String>, BoxError> {
 
     if let Some(latest) = releases.latest() {
         let current = cargo_crate_version!();
-        info!("Current app version: v{}, Latest release on GitHub: v{}", current, latest.version());
+        info!(
+            "Current app version: v{}, Latest release on GitHub: v{}",
+            current,
+            latest.version()
+        );
 
         if self_update::version::bump_is_greater(current, latest.version())
-            .map_err(|e| Box::new(e) as BoxError)? 
+            .map_err(|e| Box::new(e) as BoxError)?
         {
             info!("Update available: v{} -> v{}", current, latest.version());
             return Ok(Some(latest.version().to_string()));
@@ -31,12 +41,16 @@ fn check_sync() -> Result<Option<String>, BoxError> {
             info!("Fumiko is already up to date.");
         }
     } else {
-        warn!("No releases found on GitHub repository {}/{}", REPO_OWNER, REPO_NAME);
+        warn!(
+            "No releases found on GitHub repository {}/{}",
+            REPO_OWNER, REPO_NAME
+        );
     }
 
     Ok(None)
 }
 
+/// Synchronously downloads, extracts, and replaces the running executable on disk.
 fn update_sync() -> Result<VersionStatus, BoxError> {
     info!("Starting in-place update process...");
 
@@ -60,6 +74,9 @@ fn update_sync() -> Result<VersionStatus, BoxError> {
     Ok(status)
 }
 
+/// Non-blocking release check offloaded to Tokio's blocking thread pool.
+///
+/// Running network and JSON operations on Tokio's blocking pool prevents UI thread stutter.
 pub async fn check_for_update() -> Result<Option<String>, String> {
     tokio::task::spawn_blocking(check_sync)
         .await
@@ -67,6 +84,7 @@ pub async fn check_for_update() -> Result<Option<String>, String> {
         .map_err(|e| e.to_string())
 }
 
+/// Non-blocking binary download and file replacement offloaded to Tokio's blocking thread pool.
 pub async fn update_app() -> Result<VersionStatus, String> {
     tokio::task::spawn_blocking(update_sync)
         .await

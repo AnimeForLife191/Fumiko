@@ -1,3 +1,5 @@
+//! Google Gmail API provider implementation.
+
 pub mod models;
 pub mod parsing;
 
@@ -18,17 +20,18 @@ use crate::{
     SyncPage, email_providers::gmail::parsing::apply_inline_images,
 };
 
-/// Google Gmail API client implementing the [`EmailProvider`] trait.
+/// Google Gmail API client implementing [`EmailProvider`].
 pub struct GmailProvider {
     http_client: ReqwestClient,
 }
 
 impl GmailProvider {
-    /// Creates a new `GmailProvider` using the provided HTTP client.
+    /// Creates a new `GmailProvider` with the supplied HTTP client.
     pub fn new(http_client: ReqwestClient) -> Self {
         Self { http_client }
     }
 
+    /// Fetches the user profile and current history cursor via `GET /users/me/profile`.
     async fn fetch_gmail_profile(
         &self,
         access_token: &str,
@@ -46,12 +49,12 @@ impl GmailProvider {
         Ok(profile)
     }
 
+    /// Hydrates metadata for a single message using `format=metadata` to avoid downloading bodies.
     async fn fetch_one_summary(
         &self,
         access_token: &str,
         message_id: &str,
     ) -> Result<MessageMetadata, ProviderError> {
-        // Querying format=metadata avoids downloading the entire MIME payload just to render inbox lists.
         let detail_url = format!(
             "https://gmail.googleapis.com/gmail/v1/users/me/messages/{message_id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From"
         );
@@ -94,6 +97,7 @@ impl GmailProvider {
         })
     }
 
+    /// Downloads and decodes full message content with inlined CID images.
     async fn fetch_full_message_inner(
         &self,
         access_token: &str,
@@ -130,15 +134,14 @@ impl GmailProvider {
             None => None,
         };
 
-        // MIME tree extraction: text/plain and text/html nodes can reside at any depth in multipart trees.
+        // Derive plain-text fallback using html2text if email contains no text/plain part
         let body_text = match find_part(&payload, "text/plain") {
             Some(part) => {
                 extract_part_content(&self.http_client, access_token, message_id, part).await?
             }
             None => body_html
                 .as_ref()
-                .and_then(|html| html2text::from_read(html.as_bytes(), 80)
-                .ok())
+                .and_then(|html| html2text::from_read(html.as_bytes(), 80).ok()),
         };
 
         let mut attachments = Vec::new();
@@ -273,7 +276,7 @@ impl EmailProvider for GmailProvider {
                 .send()
                 .await?;
 
-            // Gmail returns HTTP 404 when the startHistoryId has expired from their history logs.
+            // Gmail returns HTTP 404 when the startHistoryId has expired from history retention logs
             if raw_response.status() == reqwest::StatusCode::NOT_FOUND {
                 return Err(ProviderError::CursorExpired);
             }
@@ -298,7 +301,7 @@ impl EmailProvider for GmailProvider {
                         }
                     }
 
-                    // Gmail signals move-to-trash/spam via label additions rather than hard deletions.
+                    // Gmail reports spam/trash transitions as label additions rather than hard deletions
                     if let Some(labels_added) = record.labels_added {
                         for label_added in labels_added {
                             let is_trash = label_added.label_ids.iter().any(|l| l == "TRASH");
@@ -310,9 +313,14 @@ impl EmailProvider for GmailProvider {
                         }
                     }
 
+                    // Catch un-trash and un-spam restorations
                     if let Some(labels_removed) = record.labels_removed {
                         for label_removed in labels_removed {
-                            if label_removed.label_ids.iter().any(|l| l == "TRASH" || l == "SPAM") {
+                            if label_removed
+                                .label_ids
+                                .iter()
+                                .any(|l| l == "TRASH" || l == "SPAM")
+                            {
                                 restored_message_ids.push(label_removed.message.id);
                             }
                         }
@@ -326,7 +334,6 @@ impl EmailProvider for GmailProvider {
             }
         }
 
-        // Deduplicate IDs: multiple history records within the same range can reference the same message.
         new_message_ids.sort_unstable();
         new_message_ids.dedup();
 

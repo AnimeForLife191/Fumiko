@@ -1,3 +1,5 @@
+//! MIME tree parsing, character encoding normalization, and Base64 decoding for Gmail.
+
 use base64::engine::general_purpose::{STANDARD, URL_SAFE};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use common::ProviderError;
@@ -7,6 +9,7 @@ use reqwest::Client as ReqwestClient;
 use super::AttachmentMeta;
 use super::models::{AttachmentDataResponse, MessageHeader, MessagePartFull};
 
+/// Finds the first header matching `name` case-insensitively.
 pub fn header_value<'a>(headers: &'a [MessageHeader], name: &str) -> Option<&'a str> {
     headers
         .iter()
@@ -14,6 +17,7 @@ pub fn header_value<'a>(headers: &'a [MessageHeader], name: &str) -> Option<&'a 
         .map(|h| h.value.as_str())
 }
 
+/// Extracts and resolves the character encoding specified in `Content-Type`, defaulting to UTF-8.
 pub fn charset_for_part(part: &MessagePartFull) -> &'static Encoding {
     part.headers
         .as_ref()
@@ -28,9 +32,9 @@ pub fn charset_for_part(part: &MessagePartFull) -> &'static Encoding {
         .unwrap_or(encoding_rs::UTF_8)
 }
 
+/// Decodes URL-safe Base64 message part data, falling back between unpadded and padded variants.
 fn decode_body(data: &str, encoding: &'static Encoding) -> Result<String, ProviderError> {
     let clean_data = data.trim();
-    // Protocol quirk: Gmail documents URL-safe unpadded Base64, but occasionally sends padded data.
     let bytes = match URL_SAFE_NO_PAD.decode(clean_data) {
         Ok(b) => b,
         Err(_) => match URL_SAFE.decode(clean_data) {
@@ -47,6 +51,7 @@ fn decode_body(data: &str, encoding: &'static Encoding) -> Result<String, Provid
     Ok(text.into_owned())
 }
 
+/// Recursively searches a MIME tree for a part matching the target MIME type.
 pub fn find_part<'a>(part: &'a MessagePartFull, target_mime: &str) -> Option<&'a MessagePartFull> {
     if part.mime_type == target_mime {
         let has_content = part
@@ -64,6 +69,7 @@ pub fn find_part<'a>(part: &'a MessagePartFull, target_mime: &str) -> Option<&'a
         .find_map(|p| find_part(p, target_mime))
 }
 
+/// Extracts the cleaned `Content-ID` header value without enclosing angle brackets.
 fn content_id(part: &MessagePartFull) -> Option<&str> {
     part.headers
         .as_ref()
@@ -71,6 +77,7 @@ fn content_id(part: &MessagePartFull) -> Option<&str> {
         .map(|v| v.trim_start_matches('<').trim_end_matches('>'))
 }
 
+/// Recursively traverses a MIME tree, separating regular attachments from inline CID images.
 pub fn collect_attachments(
     part: &MessagePartFull,
     out: &mut Vec<AttachmentMeta>,
@@ -79,7 +86,6 @@ pub fn collect_attachments(
     if let (Some(filename), Some(body)) = (&part.filename, &part.body) {
         if !filename.is_empty() {
             if let Some(attachment_id) = &body.attachment_id {
-                // If a Content-ID header exists, this is an inline image referenced by cid: in the HTML.
                 match content_id(part) {
                     Some(cid) => inline_out.push((
                         cid.to_string(),
@@ -103,6 +109,7 @@ pub fn collect_attachments(
     }
 }
 
+/// Fetches inline image attachments and substitutes case-insensitive `cid:` references with data URIs.
 pub async fn apply_inline_images(
     http_client: &ReqwestClient,
     access_token: &str,
@@ -145,6 +152,7 @@ pub async fn apply_inline_images(
     Ok(Some(html))
 }
 
+/// Downloads and decodes body content for a MIME part, fetching from attachment storage if necessary.
 pub async fn extract_part_content(
     http_client: &reqwest::Client,
     access_token: &str,

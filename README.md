@@ -5,9 +5,9 @@
 
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-blue.svg)](https://opensource.org/licenses/MPL-2.0)
 [![Built with Rust](https://img.shields.io/badge/Language-Rust_1.80+-dea584.svg?logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![UI: Dioxus](https://img.shields.io/badge/UI-Dioxus_0.7.10-3b82f6.svg)](https://dioxuslabs.com/)
+[![UI: Dioxus](https://img.shields.io/badge/UI-Dioxus_0.7-3b82f6.svg)](https://dioxuslabs.com/)
 [![Storage: SQLite](https://img.shields.io/badge/Storage-SQLite_WAL-003B57.svg?logo=sqlite&logoColor=white)](https://sqlite.org/)
-[![Local AI: Ollama](https://img.shields.io/badge/Local_AI-Ollama-black.svg)](https://ollama.com/)
+[![Inference: Built-in & Ollama](https://img.shields.io/badge/Local_AI-Built--in_%7C_Ollama-black.svg)](https://github.com/AnimeForLife191/Fumiko)
 [![Platform](https://img.shields.io/badge/Platform-Windows_%7C_macOS_%7C_Linux-lightgrey.svg)](#)
 
 [Website](https://animeforlife191.github.io/fumiko.html) • [Documentation](https://animeforlife191.github.io/applications/fumiko/docs.html) • [Privacy Policy](https://animeforlife191.github.io/applications/fumiko/privacy.html) • [Support](https://animeforlife191.github.io/support.html) • [Discussions](https://github.com/AnimeForLife191/Fumiko/discussions)
@@ -18,9 +18,9 @@
 
 **Fumiko** is a desktop email watcher that runs completely on your computer.
 
-You give her rules for what you care about (like *"job interviews"*, *"urgent client questions"*, or *"receipts"*), and she keeps an eye on your Gmail and Outlook inboxes in the background. When an email matches your criteria, she flags it using a local AI model running directly on your machine.
+You give her rules for what you care about (like *"interview invitations"*, *"job alerts"*, or *"receipts & orders"*), and she monitors your inboxes in the background across **Gmail**, **Outlook**, and standard **IMAP**. When an email matches your criteria, she flags it using an on-device local AI model.
 
-**No cloud AI reading your inbox. No tracking. No passwords leaving your machine.**
+**No cloud AI reading your inbox. No telemetry. No passwords leaving your machine.**
 
 ---
 
@@ -28,14 +28,20 @@ You give her rules for what you care about (like *"job interviews"*, *"urgent cl
   <img src="app/assets/screenshots/screenshot_dashboard.png" alt="Fumiko Dashboard Preview" width="1200">
 </div>
 
-## What She Does
+## Key Features
 
-* **100% Private & Local**: Everything runs on your machine through [Ollama](https://ollama.com). None of your email text, headers, or prompts are ever sent to OpenAI, Google, or any remote server.
-* **Smart Two-Tier Scanning (Keeps your PC fast)**: A tiny 1B–3B model quickly checks the subject line and preview first during background sync. Only if an email looks relevant or ambiguous does she load the body for a deeper read, capping memory so your computer doesn't bog down.
-* **The Findings Board**: Instead of digging through hundreds of promo emails and newsletters, matched emails get pinned to their own clean dashboard so you don't lose track of what matters.
-* **No Passwords Stored**: Connects via OAuth 2.0 with PKCE and loopback ports. Fumiko never sees or saves your actual email password. Refresh tokens are stored directly in your OS credential vault (Windows Credential Manager, Apple Keychain, or Linux Secret Service).
-* **Fast & Lightweight**: Built with Rust and backed by SQLite running in WAL mode with UUIDv7 indexing so the inbox loads instantly without lag.
-* **Custom Themes**: Don't like the default colors? Drop a simple `custom.css` file into your local app folder to tweak the interface however you like.
+* **100% Private & Local**: Everything runs on your machine. None of your email text, headers, previews, or prompts are ever sent to OpenAI, Google, or remote cloud servers.
+* **Zero-Setup Built-in Engine (or use Ollama)**: Includes a bundled, plug-and-play sidecar engine that downloads quantized GGUF models directly inside the app. If you already have [Ollama](https://ollama.com) running, Fumiko supports that with a single toggle too.
+* **Smart Two-Tier Scanning (Keeps your PC fast)**: A lightweight 1B to 3B model scans the sender, subject, and preview snippet first during inbox sync (Tier 1). Only if an email is ambiguous does she retrieve the body for a deeper read (Tier 2), strictly capping context and token generation to prevent system lag.
+* **Broad Provider Support**:
+  * **OAuth 2.0 PKCE**: Connect personal Microsoft accounts or custom Google Cloud projects over loopback without exposing credentials.
+  * **Universal IMAP with App Passwords**: Connect standard IMAP accounts (Gmail, iCloud, Fastmail, Yahoo, custom self-hosted mailboxes) with automated pre-flight connection verification and password whitespace formatting.
+* **The Findings Board**: Instead of digging through hundreds of newsletters and promotions, rule-matching emails get triaged onto a dedicated board with confidence scoring.
+* **Configurable Storage & Retention**: Choose how many emails to store and display locally. Older messages beyond your threshold are automatically pruned in the background to keep SQLite fast and lightweight.
+* **Zero Secrets in SQLite**: Passwords and OAuth refresh tokens live exclusively in your operating system's native credential store (Windows Credential Manager, Apple Keychain, or Linux Secret Service).
+* **Instant & Crash-Resistant**: Powered by Rust, connection pooling, and SQLite in WAL mode with monotonically increasing UUIDv7 indexing.
+* **Sandboxed Viewing & Link Safety**: Untrusted HTML email markup is sanitized through Ammonia and isolated inside a sandboxed `<iframe>`. Links are trapped and routed safely to your system's default browser.
+* **Custom Theming**: Tweak colors, surfaces, and typography at runtime by dropping a `custom.css` file into your local app data folder.
 
 ---
 
@@ -43,24 +49,24 @@ You give her rules for what you care about (like *"job interviews"*, *"urgent cl
 
 While looking for work, I found myself constantly stressed out. I was checking my inboxes over and over every day, terrified I’d miss an interview invite or a recruiter reaching out before it got buried under promotional noise. 
 
-On top of that, I was juggling three different inboxes (personal, work, and university). Regular email apps let you put them all in one window, but they don't help you actually sort out what's urgent.
+On top of that, I was juggling three different inboxes (personal, work, and university). Regular email apps let you put them all in one window, but they don't help you triage what actually matters.
 
-I built Fumiko to take that anxiety off my plate, but also to create an open project others could use and learn from. I'm still early in my journey as a developer, but I put a lot of care into documenting the architecture and keeping the codebase readable so anyone interested in local-first apps or Rust can explore how it works.
+I built Fumiko to take that anxiety off my plate, but also to build an open, verifiable project others could use and learn from. I'm a 22-year-old solo developer building this in my spare time, but I put a lot of care into documenting the architecture and keeping the codebase readable so anyone interested in local-first software or Rust can explore how it works.
 
 ---
 
-## Developer Notes & Architecture
+## Architecture & Technical Notes
 
-Fumiko is organized as a modular Rust workspace. If you're exploring the codebase or want to see how the pieces fit together, I wrote detailed architecture notes for each part:
+Fumiko is organized as a modular Rust workspace. If you're exploring the codebase, each crate has dedicated architecture documentation:
 
-| Crate / Part | What it handles | Notes |
+| Crate | What it handles | Architecture Docs |
 | :--- | :--- | :--- |
-| **`email_core`** | Sync engine, Gmail History API, Microsoft Graph Delta queries, safe cursor updates, and MIME body parsing. | [Sync & Provider Notes](docs/email_core.md) |
-| **`oauth`** | RFC 8252 loopback authorization code flow with PKCE, dynamic ephemeral port binding (`127.0.0.1:0`), and constant-time CSRF validation. | [OAuth Architecture](docs/oauth.md) |
-| **`local_ai`** | Background Ollama daemon management, streaming model downloads, prompts, and context window limits. | [Local AI Architecture](docs/local_ai.md) |
-| **`storage`** | SQLite engine, WAL mode, UUIDv7 indexing, foreign keys, and the OS Keyring `TokenStore` abstraction. | [Storage Architecture](docs/storage.md) |
-| **`security`** | Threat model, memory-only access tokens, sanitized logging, and connection safety. | [Security Notes](docs/security.md) |
-| **`app`** | Desktop frontend built with Dioxus, reactive state, sanitized iframe rendering, and custom CSS injection. |[UI Notes](docs/ui.md) |
+| **`email_core`** | Sync lifecycle, Gmail History API, Microsoft Graph Delta queries, IMAP `UIDVALIDITY` handling, `BODY.PEEK` invariants, safe cursor advancement, and automated capacity pruning. | [Sync & Provider Notes](docs/email_core.md) |
+| **`oauth`** | RFC 8252 loopback authorization code flow with PKCE, dynamic ephemeral port binding (`127.0.0.1:0`), IMAP App Password verification, and constant-time CSRF validation. | [OAuth & Auth Architecture](docs/oauth.md) |
+| **`local_ai`** | Multi-backend supervisor (built-in `llama-server` on port 11435 & external Ollama on port 11434), GBNF grammar constraints, context capping, and Hugging Face GGUF streaming. | [Local AI Architecture](docs/local_ai.md) |
+| **`storage`** | SQLite engine, WAL mode, `PRAGMA synchronous = NORMAL`, UUIDv7 indexing, foreign keys, capacity pruning, and OS Keyring integration via `TokenStore`. | [Storage Architecture](docs/storage.md) |
+| **`security`** | Threat model, memory-only access tokens, sanitized logging, ammonia HTML cleansing, and iframe navigation trapping. | [Security Notes](docs/security.md) |
+| **`app`** | Desktop frontend built with Dioxus and Tao, reactive signal hierarchy, background worker channels, supervised watchers, and in-place updates. | [UI & Desktop Notes](docs/app.md) |
 
 ---
 
@@ -73,12 +79,12 @@ Fumiko is organized as a modular Rust workspace. If you're exploring the codebas
    ```bash
    cargo install dioxus-cli
    ```
-   *(Check their quickstart guide if your OS needs any specific GUI dependencies).*
-3. **Ollama**: Download and install [Ollama](https://ollama.com). Then pull a lightweight model from your terminal (or do it inside the app later):
-   ```bash
-   ollama pull llama3.2:1b
-   ```
-   *(You can also use any models you want like `phi4-mini` or `gemma2:2b` if your computer has extra RAM/VRAM).*
+3. **Inference Engine**:
+   * **Option A (Zero-Setup Built-in)**: No prerequisites! You can download verified models (like Llama 3.2 1B or Qwen 2.5 1.5B) directly from within Fumiko's Settings tab.
+   * **Option B (Ollama)**: If you prefer using an existing [Ollama](https://ollama.com) installation, ensure Ollama is running and pull your preferred model:
+     ```bash
+     ollama pull llama3.2:1b
+     ```
 
 ### Building and Running from Source
 
@@ -92,9 +98,9 @@ Fumiko is organized as a modular Rust workspace. If you're exploring the codebas
    ```bash
    cp .env.example .env
    ```
-   *Note: You don't need a `.env` file to run the app. You can type or paste your Google and Microsoft keys straight into the in-app Settings.*
+   *Note: You do not need a `.env` file to run the app. You can type or paste custom Google and Microsoft developer credentials directly into in-app Settings.*
 
-3. Run the desktop app:
+3. Run the desktop application:
    ```bash
    dx serve --platform desktop
    ```
@@ -103,87 +109,99 @@ Fumiko is organized as a modular Rust workspace. If you're exploring the codebas
 
 ## Connecting Your Accounts
 
-Fumiko works out of the box with **personal Microsoft accounts** (`@outlook.com`, `@hotmail.com`, `@live.com`).
+Fumiko supports two primary methods to connect your mailboxes:
 
-> [!NOTE]
-> **Account Setup & Verification (Why Gmail needs your own keys)**  
-> * **Personal Microsoft Accounts** (`@outlook.com`, `@hotmail.com`): Connect out of the box with zero extra setup.
-> * **School & Work Microsoft Accounts**: Will show a **"Need admin approval"** screen because Microsoft requires "Publisher Verification" (a registered company, D-U-N-S number, and Partner Center account). 
-> * **Gmail Accounts**: Because Google requires full app verification before allowing public sign-ins for restricted scopes, you'll need to set up your own free Google Cloud keys (it takes ~2 minutes. Guide below).
-> 
-> I'm a 22-year-old solo developer building this project in my spare time, so I can't jump through those enterprise legal hoops on a whim right now. If Fumiko gets enough traction, I'll definitely look into doing the corporate paperwork down the line. Until then, personal Microsoft accounts work seamlessly, and the quick Google setup below gets Gmail running in no time!
+1. **Personal Microsoft Accounts (`@outlook.com`, `@hotmail.com`, `@live.com`)**: Connects out of the box with 1-click browser OAuth. *(Note: Work and school accounts are not supported at this time due to Microsoft Publisher Verification requirements).*
+2. **Universal IMAP with App Passwords (Preferred for Gmail, iCloud, Yahoo, Fastmail, and Custom Servers)**: Connects using standard TLS IMAP and provider-generated App Passwords. Preset hosts and ports are auto-filled, and spaces in copied passwords are automatically formatted. Connecting Gmail through this method is strongly recommended to avoid 7-day token expirations.
+3. **Advanced: Google Cloud OAuth 2.0**: For power users who prefer Google's REST API over IMAP, you can supply your own free Google Cloud Client ID and Secret in settings.
 
-To use your own developer credentials, head to **Settings -> OAuth Credentials** inside the app.
-
-For full, step-by-step instructions on creating your own Google and Microsoft keys, see [CREDENTIAL_SETUP.md](CREDENTIAL_SETUP.md).
+For step-by-step instructions on setting up your accounts, see [CREDENTIAL_SETUP.md](CREDENTIAL_SETUP.md).
 
 ---
 
 ## Custom Theming
 
-Fumiko lets you change the look of the app using custom CSS without having to rebuild the code.
+Fumiko supports dynamic CSS injection without needing to recompile the binary. 
 
-Just make a file named `custom.css` in your local Fumiko data folder:
+You can customize the interface directly from **Settings → Custom Theming**:
+* **Import CSS**: Click **Import .css File** and select your `.css` file directly from the file picker.
+* **Open Theme Folder**: Open the local theme directory in your system file manager with one click to edit or drop in a `custom.css` file.
+* **Toggle on the fly**: Enable or disable your custom theme anytime with a single switch.
 
-* **Windows**: `%LOCALAPPDATA%\fumiko\custom.css`
-* **macOS**: `~/Library/Application Support/fumiko/custom.css`
-* **Linux**: `~/.local/share/fumiko/custom.css`
+### Example Palette: "Midnight Slate" (`custom.css`)
 
-### Example Palette (`custom.css`)
+A clean, distraction-free neutral blue and slate theme for users who prefer a classic workspace palette over the default violet and coral.
 
 ```css
 :root {
-    /* 1. Base Surfaces (Pitch Charcoal) */
-    --bg-primary: #090b0a;
-    --bg-secondary: #101412;
-    --bg-tertiary: #161c19;
-    --bg-surface: rgba(16, 20, 18, 0.82);
-    --bg-surface-raised: rgba(22, 28, 25, 0.90);
-    --bg-surface-card: rgba(13, 17, 15, 0.70);
+    /* 1. Base Surfaces (Neutral Slate / Dark Navy) */
+    --bg-primary: #0b0f17;
+    --bg-secondary: #111827;
+    --bg-tertiary: #1e293b;
+    --bg-surface: rgba(17, 24, 39, 0.80);
+    --bg-surface-raised: rgba(30, 41, 59, 0.88);
+    --bg-surface-card: rgba(15, 23, 42, 0.65);
     --bg-surface-translucent: rgba(255, 255, 255, 0.05);
-    --bg-hover: rgba(16, 185, 129, 0.12);
+    --bg-hover: rgba(59, 130, 246, 0.12);
 
-    /* 2. Text */
-    --text-primary: #f0fdf4;
-    --text-secondary: #86efac;
-    --text-muted: #52796f;
+    /* 2. Text & Typography */
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #64748b;
+    --text-on-accent: #ffffff;
 
-    /* 3. Primary Accent (Emerald Green) */
-    --accent-primary: #10b981;
-    --accent-primary-bright: #34d399;
-    --accent-primary-deep: #047857;
-    --accent-primary-subtle: rgba(16, 185, 129, 0.14);
-    --accent-primary-hover: rgba(16, 185, 129, 0.24);
-    --accent-primary-glow: rgba(16, 185, 129, 0.38);
+    /* 3. Primary Accent (Sapphire Blue) */
+    --accent-primary: #3b82f6;
+    --accent-primary-bright: #60a5fa;
+    --accent-primary-deep: #1d4ed8;
+    --accent-primary-subtle: rgba(59, 130, 246, 0.14);
+    --accent-primary-hover: rgba(59, 130, 246, 0.24);
+    --accent-primary-glow: rgba(59, 130, 246, 0.38);
 
-    /* 4. Secondary Accent (Electric Cyan) */
+    /* 4. Secondary Accent (Ice / Sky Cyan) */
     --accent-secondary: #06b6d4;
-    --accent-secondary-bright: #22d3ee;
+    --accent-secondary-bright: #38bdf8;
     --accent-secondary-deep: #0e7490;
-    --accent-secondary-subtle: rgba(6, 182, 212, 0.14);
-    --accent-secondary-hover: rgba(6, 182, 212, 0.24);
-    --accent-secondary-glow: rgba(6, 182, 212, 0.38);
+    --accent-secondary-subtle: rgba(6, 182, 212, 0.12);
+    --accent-secondary-hover: rgba(6, 182, 212, 0.22);
+    --accent-secondary-glow: rgba(56, 189, 248, 0.35);
 
-    /* 5. Borders */
-    --border-subtle: rgba(52, 211, 153, 0.18);
-    --border-bright: rgba(52, 211, 153, 0.45);
-    --border-accent: rgba(34, 211, 238, 0.45);
+    /* 5. Status & Utility Accents */
+    --accent-success: #34d399;
+    --accent-success-subtle: rgba(52, 211, 153, 0.14);
+    --accent-success-glow: rgba(52, 211, 153, 0.35);
 
-    /* 6. Gradients */
+    --accent-warning: #fbbf24;
+    --accent-warning-subtle: rgba(251, 191, 36, 0.14);
+
+    --accent-danger: #ef4444;
+    --accent-danger-deep: #b91c1c;
+    --accent-danger-subtle: rgba(239, 68, 68, 0.14);
+    --accent-danger-glow: rgba(239, 68, 68, 0.38);
+
+    /* 6. Borders & Outlines */
+    --border-subtle: rgba(96, 165, 250, 0.18);
+    --border-bright: rgba(96, 165, 250, 0.45);
+    --border-accent: rgba(56, 189, 248, 0.45);
+
+    /* 7. Gradients */
     --gradient-primary: linear-gradient(120deg, var(--accent-primary-deep), var(--accent-primary));
     --gradient-accent: linear-gradient(120deg, var(--accent-primary), var(--accent-secondary));
     --gradient-title: linear-gradient(135deg, var(--text-primary), var(--accent-primary-bright));
+    --gradient-danger: linear-gradient(120deg, var(--accent-danger-deep), var(--accent-danger));
 }
 ```
 
 ---
 
-## Security & Privacy
+## Security & Storage Architecture
 
-* **No Secrets in the Database**: Refresh tokens and custom client secrets live in your operating system's native keychain. The local SQLite database only stores basic headers, message metadata, and client ID's.
-* **Controlled AI Memory Usage**: Prompts and context lengths are capped (`num_ctx: 2048`, `keep_alive: 1m`) so local models won't eat up all your RAM when classifying in the background.
-* **In-Memory Access Tokens**: Short-lived tokens stay in RAM only and are wiped when the app closes.
-* **One-Click Local Wipe**: There's a button in Settings that deletes your refresh tokens from the OS keychain, purges the SQLite database, runs a `VACUUM` to clean disk space, and resets the app back to a fresh install.
+* **Zero Secrets in Database**: Passwords, refresh tokens, and OAuth secrets are stored strictly in the host OS credential vault (`keyring`). SQLite contains only non-sensitive metadata, message IDs, headers, and previews.
+* **Safe Cursor Updates**: Sync cursors advance only when an entire discovered batch has been successfully hydrated and stored, preventing dropped network packets from permanently skipping unread mail.
+* **Preserving Unread Mail**: IMAP message samples and body fetches strictly use `BODY.PEEK` instead of `BODY[]`, ensuring that background AI evaluations never mark unread emails as read on your server.
+* **Controlled AI Resource Budget**: Context lengths are capped to 2,048 tokens (`-c 2048`), output generation is bounded to 128 tokens, and single-slot execution is enforced to prevent RAM bloat and swap thrashing.
+* **Ephemeral Memory Tokens**: Access tokens remain strictly in RAM with a 50-minute proactive time-to-live and are never logged or persisted.
+* **Complete One-Click Wipe**: The "Wipe All Local Data" action purges all entries from the OS Keyring, truncates SQLite tables, and runs `PRAGMA wal_checkpoint(TRUNCATE)` followed by `VACUUM` to return disk space.
 
 ---
 
@@ -196,19 +214,19 @@ The name comes from the martial arts concept of **Shu-Ha-Ri (守破離)**:
 2. **Ha (破)**: Experiment, break convention, and innovate.
 3. **Ri (離)**: Transcend the rules and build freely.
 
-That's the philosophy behind this project: learning how things actually work under the hood, being transparent about how it's built, and making tools that respect the user.
+That is the philosophy behind this project: mastering how protocols work under the hood, being transparent about architecture, and creating tools that respect the user.
 
 ---
 
 ## Contributing
 
-Found a bug, want to improve the UI, have ideas to make the sync or classification better, or even a new feature you'd like to see? Contributions and feedback of any skill level are welcome!
+Contributions, feedback, and bug reports are welcome!
 
-1. Check open issues or start a thread in [Discussions](https://github.com/AnimeForLife191/Fumiko/discussions).
-2. Fork the repo and create a branch (`git checkout -b feature/cool-idea`).
-3. Open a Pull Request.
+1. Check open issues or start a discussion in [GitHub Discussions](https://github.com/AnimeForLife191/Fumiko/discussions).
+2. Fork the repository and create a feature branch (`git checkout -b feature/cool-idea`).
+3. Commit your changes and open a Pull Request.
 
-If you're touching sync logic or token handling, please check the checklists in [Security Notes](docs/security.md) and [Provider Notes](docs/email_core.md) first so we don't break cursor invariants.
+*Before submitting changes touching sync state or credentials, please review the checklists in [docs/security.md](docs/security.md) and [docs/email_core.md](docs/email_core.md) to ensure protocol invariants remain intact.*
 
 ---
 

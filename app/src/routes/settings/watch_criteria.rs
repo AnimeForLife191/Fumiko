@@ -1,6 +1,8 @@
+//! CRUD interface for user-defined AI classification watch criteria.
+
+use crate::AppState;
 use dioxus::prelude::*;
 use storage::Storage;
-use crate::AppState;
 
 #[component]
 pub fn WatchCriteriaSection() -> Element {
@@ -44,7 +46,7 @@ pub fn WatchCriteriaSection() -> Element {
                         new_label.set(String::new());
                         new_description.set(String::new());
                         criteria_refresh.with_mut(|n| *n += 1);
-                        state.refresh_trigger.with_mut(|n| *n += 1); // Updates dashboard stats immediately!
+                        state.refresh_trigger.with_mut(|n| *n += 1);
                     }
                     Err(e) => {
                         tracing::error!("failed to add criterion: {e}");
@@ -61,7 +63,7 @@ pub fn WatchCriteriaSection() -> Element {
             }
             div { class: "settings__section-content",
                 p { class: "settings__description",
-                    "The AI looks for these criteria when classifying emails."
+                    "The AI evaluates incoming email against these rules to surface priority matches on your Findings Board."
                 }
 
                 div { class: "settings__criteria-list",
@@ -79,6 +81,7 @@ pub fn WatchCriteriaSection() -> Element {
                                     move |_| {
                                         let storage = storage.clone();
                                         spawn(async move {
+                                            // Deletion cascades across classifications in SQLite automatically
                                             if let Err(e) = storage.delete_criterion(criterion_id).await {
                                                 tracing::error!("failed to delete criterion: {e}");
                                             } else {
@@ -97,13 +100,13 @@ pub fn WatchCriteriaSection() -> Element {
                 div { class: "settings__criteria-form",
                     input {
                         class: "settings__input-field",
-                        placeholder: "Label (e.g. Promotions)",
+                        placeholder: "Label (e.g. Interviews, Receipts)",
                         value: "{new_label}",
                         oninput: move |evt| new_label.set(evt.value()),
                     }
                     input {
                         class: "settings__input-field",
-                        placeholder: "Description (what to look for)",
+                        placeholder: "Description (what specifically to look for)",
                         value: "{new_description}",
                         oninput: move |evt| new_description.set(evt.value()),
                     }

@@ -1,3 +1,5 @@
+//! Content parsing, plain-text extraction, and attachment processing for Microsoft Graph.
+
 use html2text::from_read;
 use reqwest::Client as ReqwestClient;
 
@@ -6,10 +8,10 @@ use crate::{AttachmentMeta, ProviderError};
 
 const GRAPH_BASE: &str = "https://graph.microsoft.com/v1.0";
 
+/// Derives plain text locally with `html2text` if the body is delivered as HTML.
 pub fn extract_body(body: Option<OutlookBody>) -> (Option<String>, Option<String>) {
     match body {
         Some(b) if b.content_type.eq_ignore_ascii_case("html") => {
-            // Derive plain text locally with html2text so both bodies are available without an extra API call.
             let derived_text = from_read(b.content.as_bytes(), 80).ok();
             (derived_text, Some(b.content))
         }
@@ -18,6 +20,7 @@ pub fn extract_body(body: Option<OutlookBody>) -> (Option<String>, Option<String
     }
 }
 
+/// Fetches non-inline attachment metadata for an email.
 pub async fn extract_attachments(
     http_client: &ReqwestClient,
     access_token: &str,
@@ -53,12 +56,12 @@ pub async fn extract_attachments(
     Ok(attachments)
 }
 
+/// Fetches inline attachments filtered on the server side via `$filter=isInline eq true`.
 pub async fn fetch_inline_attachments(
     http_client: &ReqwestClient,
     access_token: &str,
     message_id: &str,
 ) -> Result<Vec<OutlookAttachment>, ProviderError> {
-    // Filter on the server side to only download bytes for inline images embedded within HTML bodies.
     let url = format!(
         "{GRAPH_BASE}/me/messages/{message_id}/attachments?$filter=isInline eq true&$select=contentType,isInline,microsoft.graph.fileAttachment/contentId,microsoft.graph.fileAttachment/contentBytes"
     );
@@ -75,6 +78,7 @@ pub async fn fetch_inline_attachments(
     Ok(response.value)
 }
 
+/// Replaces case-insensitive `cid:` references inside HTML bodies with Base64 data URIs.
 pub fn apply_inline_images(
     html: Option<String>,
     inline_attachments: &[OutlookAttachment],
@@ -95,7 +99,7 @@ pub fn apply_inline_images(
 
         let clean_cid = content_id.trim_start_matches('<').trim_end_matches('>');
         let data_uri = format!("data:{content_type};base64,{content_bytes}");
-        
+
         if let Ok(re) = regex::Regex::new(&format!(r"(?i)cid:{}", regex::escape(clean_cid))) {
             html = re.replace_all(&html, &data_uri).into_owned();
         }

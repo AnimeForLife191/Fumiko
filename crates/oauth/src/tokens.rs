@@ -1,4 +1,5 @@
-use std::str::FromStr;
+//! Token conversion, refresh operations, and unified account secret hydration.
+
 use std::time::{Duration, Instant};
 
 use envcrypt::option_envc;
@@ -12,29 +13,48 @@ use common::{Provider, TokenError};
 use storage::Storage;
 use storage::models::LinkedAccount;
 
+/// Converts a provider token response into a safe in-memory [`TokenSet`].
+///
+/// Automatically falls back to the existing refresh token if the provider omits a replacement
+/// during refresh. Applies a proactive 10-minute expiry safety buffer (capped to a maximum
+/// 50-minute TTL) so that active background sync loops never race against expired credentials.
 pub fn response_to_token_set(
     token_result: &impl TokenResponse,
     fallback_refresh_token: Option<String>,
 ) -> TokenSet {
     let access_token = token_result.access_token().secret().to_string();
 
-    // Preserve the existing refresh token if provider omits a replacement during refresh.
+    // RFC 6749 Section 6 permits token endpoints to omit a new refresh token if the existing
+    // refresh token remains valid. If omitted, we preserve our existing token.
     let refresh_token = token_result
         .refresh_token()
         .map(|t| t.secret().to_string())
         .or(fallback_refresh_token);
 
-    let expires_in = token_result
+    // Most providers issue access tokens valid for 3600 seconds (1 hour).
+    let raw_expires_in = token_result
         .expires_in()
         .unwrap_or(Duration::from_secs(3600));
+
+    // Proactive refresh buffer: Subtract 10 minutes from provider expiration, clamping
+    // between 1 minute minimum and 50 minutes maximum. This ensures active sync operations
+    // never attempt API requests with a near-expired access token.
+    let safe_expires_in = raw_expires_in
+        .saturating_sub(Duration::from_secs(10 * 60))
+        .max(Duration::from_secs(60))
+        .min(Duration::from_secs(50 * 60));
 
     TokenSet {
         access_token,
         refresh_token,
-        expires_at: Instant::now() + expires_in,
+        expires_at: Instant::now() + safe_expires_in,
     }
 }
 
+/// Exchanges a refresh token with the identity provider for a fresh [`TokenSet`].
+///
+/// # Errors
+/// Returns [`TokenError::Request`] if the HTTP exchange with the token endpoint fails.
 pub async fn refresh_access_token(
     oauth_client: &OAuthClient,
     http_client: &ReqwestClient,
@@ -52,31 +72,52 @@ pub async fn refresh_access_token(
     ))
 }
 
-/// Retrieves a fresh access token for a linked account using its stored refresh token.
+/// Retrieves a fresh authentication token or password for a linked account.
 ///
-/// Loads the account's long-lived refresh token from the OS keyring, exchanges it with the
-/// identity provider for a new access token, and transparently updates the keyring if the
-/// provider issued a replacement refresh token (refresh token rotation).
+/// Unified across both account types:
+/// 1. IMAP Accounts: Retrieves the encrypted App Password from the OS keyring and returns it
+///    immediately as the active `access_token` with an in-memory 50-minute TTL.
+/// 2. OAuth Accounts: Loads the refresh token from the OS keyring, exchanges it with the
+///    identity provider for a fresh access token, and transparently updates the keyring if the
+///    provider issued a replacement refresh token (refresh token rotation).
 ///
 /// # Errors
-/// Returns [`TokenError::MissingRefreshToken`] if no token exists in the OS keyring,
-/// or [`TokenError::Request`] if the HTTP exchange with the provider fails.
+/// Returns [`TokenError::MissingAccountSecret`] if no secret exists in the OS keyring for the account,
+/// [`TokenError::Credentials`] if client credentials cannot be resolved,
+/// [`TokenError::Request`] if the network exchange fails,
+/// or [`TokenError::Storage`] if interacting with the OS keyring fails.
 pub async fn get_access_token_for_account(
     storage: &Storage,
     account: &LinkedAccount,
     http_client: &ReqwestClient,
 ) -> Result<TokenSet, TokenError> {
+    // 1. IMAP Account Branch
+    // For IMAP accounts, the App Password itself serves as the active secret.
+    // Setting an in-memory 50-minute TTL enforces RAM cache eviction hygiene,
+    // requiring the password to be re-read from the encrypted OS keyring periodically.
+    if account.provider == Provider::Imap || account.imap_host.is_some() {
+        let password = storage
+            .token_store
+            .get_account_secret(account.id)?
+            .ok_or(TokenError::MissingAccountSecret(account.id))?;
+
+        return Ok(TokenSet {
+            access_token: password,
+            refresh_token: None,
+            expires_at: Instant::now() + Duration::from_secs(50 * 60),
+        });
+    }
+
+    // 2. OAuth Account Branch
     let refresh_token = storage
         .token_store
-        .get_refresh_token(account.id)?
-        .ok_or(TokenError::MissingRefreshToken(account.id))?;
+        .get_account_secret(account.id)?
+        .ok_or(TokenError::MissingAccountSecret(account.id))?;
 
-    let provider =
-        Provider::from_str(account.provider.as_str()).map_err(TokenError::UnsupportedProvider)?;
-
-    let provider_kind = match provider {
+    let provider_kind = match account.provider {
         Provider::Gmail => OAuthProvider::Google,
         Provider::Outlook => OAuthProvider::Microsoft,
+        Provider::Imap => unreachable!("IMAP handled above"),
     };
 
     let credentials = match provider_kind {
@@ -106,11 +147,13 @@ pub async fn get_access_token_for_account(
 
     let tokens = refresh_access_token(&oauth_client, http_client, &refresh_token).await?;
 
+    // Refresh Token Rotation: If the provider issued a new refresh token alongside
+    // the new access token, persist the new refresh token to the OS keyring immediately.
     if let Some(new_refresh_token) = tokens.refresh_token.as_deref() {
         if new_refresh_token != refresh_token {
             storage
                 .token_store
-                .save_refresh_token(account.id, new_refresh_token)?;
+                .save_account_secret(account.id, new_refresh_token)?;
         }
     }
 
