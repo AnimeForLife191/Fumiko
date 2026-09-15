@@ -75,35 +75,88 @@ Fumiko is organized as a modular Rust workspace. If you're exploring the codebas
 ### Prerequisites
 
 1. **Rust Toolchain**: Install [rustup](https://rustup.rs/) (Rust 1.80+ recommended).
-2. **[Dioxus CLI](https://dioxuslabs.com/learn/0.7/getting_started/)**:
+2. **Inference Engine Setup (Choose One)**:
+   * **Option A: Built-in Engine (`llama-server`)**:
+     * Download the prebuilt release matching your hardware (CPU, Vulkan, CUDA, Metal, etc.) from the **[llama.cpp Releases page](https://github.com/ggml-org/llama.cpp/releases/)**.
+     * Extract `llama-server` into a `./bin/` folder inside the project root.
+     * **Important (Shared Libraries)**: Keep all bundled `.so`, `.so.0`, and `.dll` companion libraries (like `libllama.so`, `libggml.so`, etc.) in the exact same directory as `llama-server`, otherwise the dynamic linker will fail to launch the process:
+       ```text
+       Fumiko/
+       ├── Cargo.toml
+       ├── bin/
+       │   ├── llama-server (or llama-server.exe)
+       │   ├── *.so / *.so.0 (Linux companion shared libraries)
+       │   └── *.dll (Windows dynamic libraries)
+       └── ...
+       ```
+     * Models (like Llama 3.2 1B or Qwen 2.5 1.5B) can be downloaded directly inside Fumiko's Settings tab after launch.
+   * **Option B: Ollama**:
+     * If you already have [Ollama](https://ollama.com) installed and running, pull your preferred model:
+       ```bash
+       ollama pull llama3.2:1b
+       ```
+     * Switch the active backend to "Ollama" in Fumiko's Settings.
+3. *(Optional)* **Dioxus CLI**: Only needed if you want live hot-reloading while modifying UI files:
    ```bash
    cargo install dioxus-cli
    ```
-3. **Inference Engine**:
-   * **Option A (Zero-Setup Built-in)**: No prerequisites! You can download verified models (like Llama 3.2 1B or Qwen 2.5 1.5B) directly from within Fumiko's Settings tab.
-   * **Option B (Ollama)**: If you prefer using an existing [Ollama](https://ollama.com) installation, ensure Ollama is running and pull your preferred model:
-     ```bash
-     ollama pull llama3.2:1b
-     ```
+
+---
 
 ### Building and Running from Source
 
-1. Clone the repository:
+1. **Clone the repository**:
    ```bash
    git clone https://github.com/AnimeForLife191/Fumiko.git
    cd Fumiko
    ```
 
-2. *(Optional)* Configure development credentials:
+2. **Set up the `bin/` directory**:
+   Place `llama-server` along with its `.so`, `.so.0`, or `.dll` dependencies inside `./bin/` as shown above (if using the built-in engine).
+
+3. *(Optional)* **Configure development credentials**:
    ```bash
    cp .env.example .env
    ```
-   *Note: You do not need a `.env` file to run the app. You can type or paste custom Google and Microsoft developer credentials directly into in-app Settings.*
+   *Note: You do not need a `.env` file to run the app. You can also configure custom developer credentials directly in the in-app Settings.*
 
-3. Run the desktop application:
+4. **Run the application**:
+   Standard Cargo runs the project out of the box:
+   ```bash
+   cargo run
+   ```
+   *(Or, if you use `dioxus-cli` for hot-reloading)*:
    ```bash
    dx serve --platform desktop
    ```
+
+---
+
+### Building a Release Binary (`cargo build --release`)
+
+If you build an optimized release binary via:
+```bash
+cargo build --release
+```
+The compiled executable will be in `target/release/fumiko` (or `fumiko.exe`). 
+
+If you move the compiled binary out of the project directory to install or distribute it, Fumiko needs to locate `llama-server`. Ensure that `llama-server` and **all of its companion `.so`, `.so.0`, or `.dll` files** stay together in whichever location you choose:
+
+* **Folder structure (Recommended)**: Keep the `bin/` folder directly next to `fumiko`:
+  ```text
+  Fumiko/
+  ├── fumiko (or fumiko.exe)
+  └── bin/
+      ├── llama-server (or llama-server.exe)
+      ├── *.so / *.so.0
+      └── *.dll
+  ```
+* **Side-by-side**: Place `fumiko`, `llama-server`, and all `.so`/`.so.0`/`.dll` files together in the exact same directory.
+* **System AppData (Standalone binary)**: If you want `fumiko` to sit alone on your Desktop or in your application launcher without a local `bin/` folder, place `llama-server` and its libraries into your OS data directory:
+  * **Windows**: `%LOCALAPPDATA%\fumiko\bin\`
+  * **macOS**: `~/Library/Application Support/fumiko/bin/`
+  * **Linux**: `~/.local/share/fumiko/bin/`
+* **System PATH**: Place `llama-server` and its dependent libraries in any directory registered on your global `$PATH`.
 
 ---
 
