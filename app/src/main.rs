@@ -154,12 +154,16 @@ fn main() {
     LaunchBuilder::new()
         .with_cfg(
             Config::new()
-                .with_menu(None)
                 .with_window(
                     WindowBuilder::new()
                         .with_title("ShuhariTech | Fumiko")
-                        .with_window_icon(Some(window_icon)),
+                        .with_window_icon(Some(window_icon))
+                        .with_inner_size(dioxus::desktop::LogicalSize::new(1200.0, 800.0))
+                        .with_min_inner_size(dioxus::desktop::LogicalSize::new(900.0, 600.0))
+                        .with_resizable(true)
                 )
+                
+                .with_background_color((10, 7, 24, 255))
                 // Hides window on close button rather than terminating, keeping inbox watchers active
                 .with_close_behaviour(WindowCloseBehaviour::WindowHides)
                 // Link Trapping: Intercepts webview navigations and routes external protocols

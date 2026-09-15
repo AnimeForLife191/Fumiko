@@ -1,10 +1,28 @@
 .app {
     display: flex;
+    width: 100%;
     height: 100vh;
     overflow: hidden;
+    background-color: var(--bg-primary);
+    position: relative;
+}
+
+.app::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
     background: radial-gradient(circle at 10% 10%, var(--accent-primary-subtle), transparent 45%),
-                radial-gradient(circle at 90% 90%, var(--accent-secondary-subtle), transparent 40%),
-                var(--bg-primary);
+                radial-gradient(circle at 90% 90%, var(--accent-secondary-subtle), transparent 40%);
+    transform: translateZ(0);
+    z-index: 0;
+}
+
+
+.sidebar,
+.content-area {
+    position: relative;
+    z-index: 1;
 }
 
 .sidebar {
@@ -16,7 +34,6 @@
     padding: 24px 14px;
     box-sizing: border-box;
     background: linear-gradient(180deg, var(--bg-secondary), var(--bg-primary));
-    backdrop-filter: blur(16px);
     border-right: 1px solid var(--border-subtle);
     box-shadow: var(--sidebar-shadow);
     user-select: none;
@@ -47,6 +64,10 @@
     padding: 28px 36px;
     box-sizing: border-box;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background-color: var(--bg-primary);
+    transform: translateZ(0);
+    will-change: scroll-position;
 }
 
 .sidebar-divider {
@@ -137,7 +158,6 @@
     height: 100vh;
     min-width: 0;
     overflow: hidden;
-    position: relative;
 }
 
 /* Update Banner Component */
@@ -150,7 +170,6 @@
     background: linear-gradient(90deg, var(--accent-primary-subtle) 0%, var(--accent-secondary-subtle) 100%);
     border-bottom: 1px solid var(--border-accent);
     box-shadow: var(--banner-shadow);
-    backdrop-filter: blur(14px);
     z-index: 100;
     animation: bannerSlideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
