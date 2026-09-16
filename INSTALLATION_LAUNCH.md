@@ -1,4 +1,4 @@
-## First-Time Launch and Installation
+# First-Time Launch and Installation
 
 Because Fumiko is a free open-source project, binaries are not signed with expensive commercial certificates. On your first launch, Windows and macOS will display standard unrecognized app security prompts. 
 
