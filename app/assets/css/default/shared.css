@@ -75,14 +75,14 @@
        8. Sizing, Radii, Shadows, Layout & Transitions
        ========================================================================== */
     --sidebar-width: 250px;
-    --page-max-width: 1080px;
+    --page-max-width: 1400px;
     --page-max-width-wide: 100%;
     --split-list-min: 340px;
     --split-list-max: 400px;
     
     --radius-sm: 6px;
     --radius-md: 10px;
-    --radius-pill: 999px;
+    --radius-pill: 1000px;
     
     --transition-fast: 180ms cubic-bezier(0.16, 1, 0.3, 1);
     

@@ -25,7 +25,7 @@ You give her rules for what you care about (like *"interview invitations"*, *"jo
 ---
 
 <div align="center">
-  <img src="app/assets/screenshots/screenshot_dashboard.png" alt="Fumiko Dashboard Preview" width="1200">
+  <img src="app/assets/gif/fumiko.gif" alt="Fumiko Dashboard Preview" width="1200">
 </div>
 
 ## Key Features
