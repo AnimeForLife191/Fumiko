@@ -44,4 +44,4 @@ To help investigate and resolve the issue quickly, please include:
 
 ## Technical Security Model
 
-If you are looking for technical documentation on how Fumiko handles tokens, OS keyrings, PKCE loopback binding, and HTML sanitization, please see our detailed [Security Architecture and Threat Model](docs/security.md).
+If you are looking for technical documentation on how Fumiko handles tokens, OS keyrings, PKCE loopback binding, and HTML sanitization, please see our detailed [Security Architecture and Threat Model](docs/security_architecture.md).
